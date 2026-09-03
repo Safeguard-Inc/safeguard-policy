@@ -40,6 +40,7 @@ pub mod decision;
 pub mod evaluation;
 pub mod evaluator;
 pub mod policy;
+pub mod registries;
 pub mod rule;
 pub mod rules;
 pub mod version;
