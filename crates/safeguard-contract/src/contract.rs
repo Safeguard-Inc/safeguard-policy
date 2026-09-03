@@ -17,6 +17,7 @@ use soroban_sdk::{contract, contractimpl, Address, Env, Vec};
 use crate::admin;
 use crate::error::ContractError;
 use crate::lifecycle;
+use crate::registry;
 use crate::storage::{Id, PolicyVersionRecord, RuleRecord};
 
 #[contract]
@@ -104,5 +105,32 @@ impl PolicyContract {
         policy_id: Id,
     ) -> Result<PolicyVersionRecord, ContractError> {
         lifecycle::get_active_version(&env, &policy_id)
+    }
+
+    // ---------------------------------------------------------------- tokens
+
+    /// Bind a token to a policy. Admin or registry authority. Idempotent.
+    pub fn bind_token(
+        env: Env,
+        operator: Address,
+        policy_id: Id,
+        token: Address,
+    ) -> Result<(), ContractError> {
+        registry::bind_token(&env, &operator, &policy_id, &token)
+    }
+
+    /// Unbind a token from a policy. Admin or registry authority. Idempotent.
+    pub fn unbind_token(
+        env: Env,
+        operator: Address,
+        policy_id: Id,
+        token: Address,
+    ) -> Result<(), ContractError> {
+        registry::unbind_token(&env, &operator, &policy_id, &token)
+    }
+
+    /// The tokens bound to a policy (public read).
+    pub fn bound_tokens(env: Env, policy_id: Id) -> Vec<Address> {
+        registry::bound_tokens(&env, &policy_id)
     }
 }
