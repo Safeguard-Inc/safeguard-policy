@@ -27,8 +27,20 @@ Consumers must gate on `schema_version()` and ignore unknown properties
 
 The hook owns the identity/sanctions/jurisdiction lookups (via adapters and
 attestations, see [`adapters.md`](adapters.md)) and produces the
-`EvaluationInput` facts: account status, allowlist membership, denylist and
-sanctions match flags, jurisdiction code.
+`EvaluationInput` facts: account status, allowlist membership, denylist
+match, a sanctions-match **claim**, a jurisdiction code, plus the `subject`
+hash and `account` that key the on-chain registries.
+
+Where a deployment maintains the registries, the hook may **read** them
+instead of resolving every fact itself:
+
+- `sanctions_entry(subject_hash)` → authoritative screening status;
+- `jurisdiction(account)` → stored region classification;
+- `identity(account)` → verification record (status, attestation ref).
+
+The contract resolves the sanctions and jurisdiction facts from those
+registries when entries exist, so even a hook that sends a clean-screen
+claim cannot hide a listed subject.
 
 ### 3. Evaluate
 
@@ -72,27 +84,44 @@ Everything crossing the boundary is versioned:
 
 See [`versioning.md`](versioning.md) for the compatibility contract.
 
-## Example flow (allowlist + sanctions policy)
+## Example flow (allowlist + sanctions policy, with registries)
 
 ```text
-1. Admin:  register_version(policy, 1, hash, [ALLOWLIST-001, SANCTIONS-001])
-2. Admin:  activate_version(policy, 1)
-3. Authy:  bind_token(authority, policy, token)
-4. Hook:   facts = { status: active, member: true, matched: false, ... }
-5. Hook:   evaluate(policy, token, facts) → APPROVE
-6. Hook:   transfer proceeds; emits transfer_approved
-7. Audit:  records decision doc { decision: "APPROVE", ... }
+1.  Admin:  register_version(policy, 1, hash, [ALLOWLIST-001, SANCTIONS-001])
+2.  Admin:  activate_version(policy, 1)
+3.  Authy:  bind_token(authority, policy, token)
+4.  Authy:  set_sanctions_entry(authority, subject_hash, "OFAC-SDN", active, ...)
+5.  Hook:   evaluate(policy, token, { status: active, member: true, ... })
+           → BLOCK (sanctions_match, SANCTIONS-001)   ← registry, not the hook's claim
+6.  Hook:   refuses the transfer; emits transfer_blocked
+7.  Audit:  records decision doc { decision: "BLOCK", reason_code: "sanctions_match", ... }
 ```
 
-If the subject is later sanctions-matched (`matched: true`), the same policy
-evaluates to `BLOCK` (reason `sanctions_match`, rule `SANCTIONS-001`), the
-hook refuses the transfer and audit records the denial.
+The hook's clean-screen claim cannot override the active on-chain entry —
+step 5 blocks because the registry is authoritative for the subject hash. A
+retired entry (`retire_sanctions_entry`) lifts the block, and the
+`SanctionsEntryUpdated` event lets audit prove the dataset change.
 
-## Compatibility testing (planned)
+## Compatibility testing
 
-Phase 6 adds compatibility tests that pin the interface between this repo and
-`safeguard-hooks` (policy ids, versions, decisions, rule ids, registry
-references, reason codes) so the two repositories cannot drift apart.
+The interface between this repository and `safeguard-hooks` is pinned in
+several layers, all run by `./scripts/ci.sh`:
+
+- `safeguard-contract` tests register the **shipped policy documents** and
+  assert the documented evaluation cases at the contract level, so a policy
+  JSON and the on-chain semantics cannot drift;
+- `the_stable_numeric_interface_is_pinned` asserts every code hooks and audit
+  observe — schema version, the thirteen error codes, decision/reason/type/
+  action codes, registry statuses, input status/region codes — in one place;
+- `safeguard-sdk` golden fixtures hold the expected decision documents for
+  the worked cases, so serialization drift fails loudly;
+- the proptest suites sample unbounded input spaces (arbitrary rule sets,
+  arbitrary facts over shipped policies, arbitrary u32 codes at the contract
+  boundary) for determinism and fail-closed invariants.
+
+`safeguard-hooks` consuming these tests should treat the contract client,
+the stable codes and the golden fixtures as its compatibility contract; when
+that repository exists, cross-repo CI will run this gate against it.
 
 ## See also
 
