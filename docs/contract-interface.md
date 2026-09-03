@@ -126,10 +126,16 @@ Typed `contractevent`s published by the lifecycle and registries:
 | `sanctions_entry_updated` | subject_hash, status, dataset_version |
 | `jurisdiction_updated` | account, region |
 | `jurisdiction_cleared` | account |
+| `authority_added` | authority |
+| `authority_removed` | authority |
 
-These are the **configuration-change** events audit consumes (the
-`registry_updated` family covers compliance-data mutations). Transfer-level
-events (`transfer_approved`, `transfer_blocked`) belong to `safeguard-hooks`.
+These are the **configuration-change** events audit consumes: the
+`registry_updated` family covers compliance-data mutations, and the
+`authority_added`/`authority_removed` pair is the `registry_authority_changed`
+family proving who held the registry-authority role when. Both fire only on
+real changes (idempotent role calls and no-op registry writes stay silent).
+Transfer-level events (`transfer_approved`, `transfer_blocked`) belong to
+`safeguard-hooks`.
 
 Note for tests: in soroban-sdk 27 testutils, recorded events are scoped to
 the invocation that emitted them; query `env.events().all()` immediately

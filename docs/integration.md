@@ -66,6 +66,7 @@ Audit consumes two event streams plus on-chain state:
 | Source | What it proves |
 | ------ | -------------- |
 | Lifecycle events from the policy contract | Which policy configuration was in force when. |
+| Registry + authority events | What compliance data changed, and who held the authority role when. |
 | Transfer-level events from the hook | Which decision was applied to which operation. |
 | `get_version` / `get_active_version` queries | The exact rule set and config hash behind a decision. |
 
