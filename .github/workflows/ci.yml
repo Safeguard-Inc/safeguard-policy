@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  schema:
+    name: Policy schema & fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install validation dependencies
+        run: python3 -m pip install jsonschema
+
+      - name: Schema test battery (meta-schema, parity, negative cases)
+        run: python3 scripts/test-schema.py
+
+      - name: Fixture and policy cross-reference consistency
+        run: python3 scripts/check-fixtures.py
+
+      - name: Validate reference policies
+        run: >-
+          python3 scripts/validate_policy.py
+          policies/default/policy.json
+          policies/examples/*.json
