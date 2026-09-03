@@ -167,16 +167,16 @@ a thin on-chain shell** around it.
 ## Getting started
 
 ```bash
-# Requires Rust 1.91+ (stable)
+# Requires Rust 1.91+ (stable); the toolchain is pinned in rust-toolchain.toml
 rustup target add wasm32v1-none
 
-cargo test --workspace
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
+# The full local gate (same as CI): fmt, clippy, tests, wasm build,
+# schema battery, fixture checks
+./scripts/ci.sh
 
-# Build the Soroban contract artifact (wasm32v1-none: the Soroban
-# environment does not support wasm32-unknown-unknown on Rust 1.82+)
-cargo build -p safeguard-contract --target wasm32v1-none --release
+# Or just the Rust part / schema part
+./scripts/ci.sh rust
+./scripts/ci.sh schema
 ```
 
 ## Using policies
@@ -202,6 +202,13 @@ python3 scripts/validate_policy.py policies/default/policy.json
 - [`docs/rule-engine.md`](docs/rule-engine.md) — rule semantics and precedence
 - [`docs/security.md`](docs/security.md) — the security model and roles
 - [`docs/threat-model.md`](docs/threat-model.md) — threats and mitigations
+- [`docs/versioning.md`](docs/versioning.md) — the four version axes and compatibility
+- [`docs/contract-interface.md`](docs/contract-interface.md) — the on-chain surface
+- [`docs/registries.md`](docs/registries.md) — how compliance data reaches the engine
+- [`docs/adapters.md`](docs/adapters.md) — the off-chain integration boundary
+- [`docs/integration.md`](docs/integration.md) — how hooks and audit consume this repo
+- [`docs/how-to-evaluate.md`](docs/how-to-evaluate.md) — a worked evaluation example
+- [`docs/decisions.md`](docs/decisions.md) — design decisions and rationale
 
 ## Roadmap
 
@@ -212,7 +219,7 @@ The build order follows the phases in [`docs/architecture.md`](docs/architecture
 3. **Evaluation** — deterministic APPROVE/BLOCK/FLAG engine ✅
 4. **Registries** — identity, sanctions, jurisdiction, token scope (contract wiring)
 5. **Developer tooling** — Rust/TypeScript SDKs, CLI, fixture generation
-6. **Hardening** — fuzzing, compatibility tests against `safeguard-hooks`, testnet deployment
+6. **Hardening** — reference docs, CI, security model ✅; fuzzing, compatibility tests against `safeguard-hooks`, testnet deployment pending
 
 ## Contributing
 
