@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/safeguard-cli",
     "crates/safeguard-contract",
     "crates/safeguard-core",
     "crates/safeguard-sdk",

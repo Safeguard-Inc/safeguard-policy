@@ -16,6 +16,9 @@ pub mod evaluate;
 pub mod model;
 pub mod validation;
 
+/// The SDK crate version (compile-time metadata for downstream tools).
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub use evaluate::EvaluationFacts;
 
 pub use safeguard_core::decision::{Decision, PolicyDecision, ReasonCode};
