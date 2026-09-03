@@ -13,12 +13,52 @@ use soroban_sdk::{contractevent, Address, Env};
 use crate::storage::Id;
 
 /// A new draft version of a policy was registered.
+///
+/// Registration always creates a *version* — the spec's `policy_created`
+/// and `policy_version_created` map to this single event, emitted once per
+/// `register_version` call.
 #[contractevent]
 pub struct PolicyCreated {
     #[topic]
     pub policy_id: Id,
     pub version: u32,
     pub config_hash: Id,
+}
+
+/// One rule was registered as part of a policy version.
+///
+/// Emitted once per rule in the `register_version` call, so audit can
+/// prove which rule set — and each individual rule within it — was in a
+/// given version. `rule_type` and `action` are the stable core codes.
+#[contractevent]
+pub struct RuleRegistered {
+    #[topic]
+    pub policy_id: Id,
+    #[topic]
+    pub version: u32,
+    #[topic]
+    pub rule_id: Id,
+    pub rule_type: u32,
+    pub action: u32,
+}
+
+/// Publish a rule registration for a version.
+pub fn rule_registered(
+    env: &Env,
+    policy_id: &Id,
+    version: u32,
+    rule_id: &Id,
+    rule_type: u32,
+    action: u32,
+) {
+    RuleRegistered {
+        policy_id: policy_id.clone(),
+        version,
+        rule_id: rule_id.clone(),
+        rule_type,
+        action,
+    }
+    .publish(env);
 }
 
 /// A draft version was activated (any previously active version is
