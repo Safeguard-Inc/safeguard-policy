@@ -13,6 +13,7 @@
 //! `safeguard-contract`; see `docs/sdk.md`.
 
 pub mod model;
+pub mod validation;
 
 pub use safeguard_core::decision::{Decision, PolicyDecision, ReasonCode};
 pub use safeguard_core::evaluation::EvaluationRequest;
