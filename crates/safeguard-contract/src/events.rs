@@ -137,3 +137,37 @@ pub fn jurisdiction_cleared(env: &Env, account: &Address) {
     }
     .publish(env);
 }
+
+/// An address was added to the registry-authority set.
+///
+/// Together with [`AuthorityRemoved`] this is the `registry_authority_changed`
+/// family from the audit event list: audit needs to prove who could write
+/// compliance data at any point in time, and role changes are part of that.
+#[contractevent]
+pub struct AuthorityAdded {
+    #[topic]
+    pub authority: Address,
+}
+
+/// An address was removed from the registry-authority set.
+#[contractevent]
+pub struct AuthorityRemoved {
+    #[topic]
+    pub authority: Address,
+}
+
+/// Publish a registry-authority addition.
+pub fn authority_added(env: &Env, authority: &Address) {
+    AuthorityAdded {
+        authority: authority.clone(),
+    }
+    .publish(env);
+}
+
+/// Publish a registry-authority removal.
+pub fn authority_removed(env: &Env, authority: &Address) {
+    AuthorityRemoved {
+        authority: authority.clone(),
+    }
+    .publish(env);
+}

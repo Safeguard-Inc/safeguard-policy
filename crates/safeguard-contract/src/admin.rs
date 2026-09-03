@@ -47,6 +47,9 @@ pub fn get_authorities(env: &Env) -> Vec<Address> {
 }
 
 /// Add a registry authority. Only the admin may do this.
+///
+/// Publishes an [`crate::events::AuthorityAdded`] event when the set
+/// actually changes, so audit can prove who held the role when.
 pub fn add_authority(env: &Env, authority: &Address) -> Result<(), ContractError> {
     let current = storage::admin(env)?;
     current.require_auth();
@@ -55,23 +58,33 @@ pub fn add_authority(env: &Env, authority: &Address) -> Result<(), ContractError
     if !list.contains(authority) {
         list.push_back(authority.clone());
         storage::set_authorities(env, &list);
+        crate::events::authority_added(env, authority);
     }
     Ok(())
 }
 
 /// Remove a registry authority. Only the admin may do this.
+///
+/// Publishes an [`crate::events::AuthorityRemoved`] event when an address
+/// was actually removed.
 pub fn remove_authority(env: &Env, authority: &Address) -> Result<(), ContractError> {
     let current = storage::admin(env)?;
     current.require_auth();
 
     let list = storage::authorities(env);
     let mut filtered: Vec<Address> = vec![env];
+    let mut removed = false;
     for entry in list.iter() {
         if &entry != authority {
             filtered.push_back(entry);
+        } else {
+            removed = true;
         }
     }
-    storage::set_authorities(env, &filtered);
+    if removed {
+        storage::set_authorities(env, &filtered);
+        crate::events::authority_removed(env, authority);
+    }
     Ok(())
 }
 
