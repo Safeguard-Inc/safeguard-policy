@@ -128,6 +128,26 @@ with CI gates. Account fixtures carry no screening claim, so
 `sanctions_matched` is `false` for every subject; inspect the sanctions
 dataset separately with `registry inspect`.
 
+### `dataset build`
+
+Runs a provider sanctions snapshot through the adapter pipeline — parse,
+normalize, hash — and writes the dataset report an operator reviews before
+pushing entries to the contract's `set_sanctions_entry`:
+
+```bash
+safeguard dataset build policies/fixtures/snapshots/ofac-sample.txt -o report.json
+# source ofac: 5 entries normalized, 1 review items
+# review items (operator decision required):
+#   - subject="unmapped sample entity" …
+#       reason: unmapped provider list code "NONSTANDARD"
+```
+
+The snapshot is pipe-delimited `subject|list-code|status|effective-date`
+(see [`adapters.md`](adapters.md)). Default OFAC list/status mappings apply;
+repeat `--list PROVIDER_CODE=LIST_ID` to extend them. Review items —
+unmappable records — are never dropped silently; the command reports them
+and exits zero so the operator decides.
+
 ## Relationship to other tools
 
 | Tool | Scope |
