@@ -43,18 +43,26 @@ schema_gate() {
         policies/examples/*.json
 }
 
-typescript_gate() {
-    echo "==> TypeScript SDK (typecheck, build, tests)"
-    (cd sdk/typescript && npm ci --no-audit --no-fund && npm test)
+security_gate() {
+    echo "==> cargo-deny (advisories, bans, licenses, sources)"
+    if ! command -v cargo-deny >/dev/null 2>&1; then
+        echo "    cargo-deny not installed; skipping (CI runs it)" >&2
+    else
+        cargo-deny check
+    fi
+
+    echo "==> npm audit (TypeScript SDK)"
+    (cd sdk/typescript && npm audit --audit-level=high)
 }
 
 case "${1:-all}" in
     rust)       rust_gate ;;
     schema)     schema_gate ;;
     typescript) typescript_gate ;;
-    all)        rust_gate; schema_gate; typescript_gate ;;
+    security)   security_gate ;;
+    all)        rust_gate; schema_gate; typescript_gate; security_gate ;;
     *)
-        echo "usage: $0 [rust|schema|typescript|all]" >&2
+        echo "usage: $0 [rust|schema|typescript|security|all]" >&2
         exit 2
         ;;
 esac

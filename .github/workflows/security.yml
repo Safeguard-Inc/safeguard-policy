@@ -1,0 +1,51 @@
+name: Security
+
+on:
+  schedule:
+    # Nightly dependency-advisory sweep (cargo-deny and npm audit fetch the
+    # latest advisory databases).
+    - cron: "0 3 * * *"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "**/Cargo.toml"
+      - "deny.toml"
+      - "sdk/typescript/package.json"
+      - "sdk/typescript/package-lock.json"
+  workflow_dispatch:
+
+jobs:
+  cargo-deny:
+    name: Rust advisories & licenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          arguments: --all-features
+
+  npm-audit:
+    name: TypeScript dependency audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk/typescript
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: sdk/typescript/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit production dependencies
+        run: npm audit --audit-level=high
