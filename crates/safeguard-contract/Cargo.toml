@@ -1,0 +1,28 @@
+[package]
+name = "safeguard-contract"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Soroban policy contract for Stellar Confidential Token compliance"
+keywords = ["stellar", "soroban", "compliance", "policy", "confidential-tokens"]
+categories = ["cryptography::cryptocurrencies"]
+
+# The soroban-sdk macros generate test-support code containing `unsafe` (test
+# function registration into the host), so unsafe_code cannot be forbidden in
+# this crate as it is in safeguard-core. The policy engine itself remains
+# unsafe-free; this only permits SDK-generated harness code.
+[lints.rust]
+unsafe_code = "allow"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { version = "27.0.6" }
+safeguard-core = { path = "../safeguard-core" }
+
+[dev-dependencies]
+soroban-sdk = { version = "27.0.6", features = ["testutils"] }
