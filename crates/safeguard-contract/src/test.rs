@@ -12,7 +12,7 @@ use crate::{PolicyContract, PolicyContractClient};
 
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::testutils::Events as _;
-use soroban_sdk::{vec, Address, BytesN, Env};
+use soroban_sdk::{vec, Address, Bytes, BytesN, Env};
 
 use safeguard_core::decision::{Decision, ReasonCode};
 use safeguard_core::rule::{RuleAction, RuleId, RuleType};
@@ -408,4 +408,178 @@ fn scope_guards_refuse_evaluation_outside_the_policy() {
     // After binding, evaluation succeeds.
     client.bind_token(&admin, &policy, &token);
     assert_approve(&client.evaluate(&policy, &token, &active_input(&env, &admin)));
+}
+
+// -------------------------------------------------------------- registries
+
+/// Register + activate a version with a blocking jurisdiction rule and bind
+/// the token, for registry-resolution tests.
+fn jurisdiction_active(
+    env: &Env,
+    client: &PolicyContractClient,
+    admin: &Address,
+    policy: &Id,
+    token: &Address,
+) {
+    let rules = vec![
+        env,
+        RuleRecord {
+            rule_id: rid(env, "JURISDICTION-001"),
+            rule_type: RuleType::Jurisdiction.to_code(),
+            action: RuleAction::Block.to_code(),
+        },
+    ];
+    client.register_version(policy, &1, &config_hash(env, 3), &rules);
+    client.activate_version(policy, &1);
+    client.bind_token(admin, policy, token);
+}
+
+fn subject_hash(env: &Env) -> Id {
+    BytesN::from_array(env, &[1; 32])
+}
+
+/// The identity registry accepts writes from a registry authority and
+/// publishes one typed event; reads return the record.
+#[test]
+fn identity_registry_lifecycle_and_events() {
+    let env = Env::default();
+    let (admin, authority, _, _, _, client) = setup(&env);
+    let account = Address::generate(&env);
+
+    // Authority writes a verified record with an attestation reference.
+    client.set_identity(
+        &authority,
+        &account,
+        &0,
+        &rid(&env, "ATT-1"),
+        &1_800_000_000,
+    );
+    let all_events = env.events().all();
+    assert_eq!(
+        all_events.events().len(),
+        1,
+        "set_identity published one event"
+    );
+
+    let record = client.identity(&account).unwrap();
+    assert_eq!(record.status, 0); // verified
+    assert_eq!(record.attestation_ref, rid(&env, "ATT-1"));
+    assert_eq!(record.expires_at, 1_800_000_000);
+
+    // Replacing the record works (same account, new status).
+    client.set_identity(
+        &authority,
+        &account,
+        &2,
+        &rid(&env, "ATT-1"),
+        &1_800_000_000,
+    ); // revoked
+    let updated = client.identity(&account).unwrap();
+    assert_eq!(updated.status, 2);
+
+    // Removal clears the record; no event when there is nothing to remove.
+    client.remove_identity(&admin, &account);
+    assert!(client.identity(&account).is_none());
+
+    // Unknown status codes are rejected before persisting.
+    let err = client
+        .try_set_identity(&authority, &account, &99, &rid(&env, "ATT-1"), &0)
+        .unwrap_err();
+    assert_eq!(err, contract_err(ContractError::InvalidRegistryData));
+
+    // A stranger cannot write.
+    let stranger = Address::generate(&env);
+    let err = client
+        .try_set_identity(&stranger, &account, &0, &rid(&env, "ATT-1"), &0)
+        .unwrap_err();
+    assert_eq!(err, contract_err(ContractError::Unauthorized));
+}
+
+/// An active sanctions entry makes evaluate block even when the caller
+/// claims no match; retiring the entry restores the caller-claim behavior.
+#[test]
+fn sanctions_registry_is_authoritative_in_evaluate() {
+    let env = Env::default();
+    let (admin, authority, _, token, policy, client) = setup(&env);
+    bound_and_active(&env, &client, &admin, &policy, &token);
+
+    let mut facts = active_input(&env, &admin);
+    facts.sanctions_matched = false; // caller claims a clean screen
+
+    // No entry: the caller's claim stands and evaluation approves.
+    assert_approve(&client.evaluate(&policy, &token, &facts));
+
+    // Authority lists the subject hash as active on the OFAC-SDN list.
+    client.set_sanctions_entry(
+        &authority,
+        &subject_hash(&env),
+        &rid(&env, "OFAC-SDN"),
+        &0, // active
+        &1, // dataset version
+        &1_700_000_000,
+        &Bytes::from_slice(&env, b"ofac"),
+    );
+    assert_eq!(env.events().all().events().len(), 1);
+
+    // Registry is authoritative: the caller's clean-screen claim no longer
+    // stands and the blocking sanctions rule fires.
+    let result = client.evaluate(&policy, &token, &facts);
+    assert_eq!(result.decision, Decision::Block.to_code());
+    assert_eq!(result.reason_code, ReasonCode::SanctionsMatch.to_code());
+
+    // Retiring the entry (never deleting) lifts the block for this subject.
+    client.retire_sanctions_entry(&authority, &subject_hash(&env));
+    assert_approve(&client.evaluate(&policy, &token, &facts));
+
+    // Invalid status code and version zero are rejected.
+    let err = client
+        .try_set_sanctions_entry(
+            &authority,
+            &subject_hash(&env),
+            &rid(&env, "OFAC-SDN"),
+            &99,
+            &1,
+            &0,
+            &Bytes::from_slice(&env, b"ofac"),
+        )
+        .unwrap_err();
+    assert_eq!(err, contract_err(ContractError::InvalidRegistryData));
+}
+
+/// A stored jurisdiction classification is authoritative in evaluate; a
+/// stored prohibited region blocks even when the caller claims permitted.
+#[test]
+fn jurisdiction_registry_is_authoritative_in_evaluate() {
+    let env = Env::default();
+    let (admin, authority, _, token, policy, client) = setup(&env);
+    jurisdiction_active(&env, &client, &admin, &policy, &token);
+    let account = Address::generate(&env);
+
+    let mut facts = active_input(&env, &account);
+    facts.jurisdiction = 0; // caller claims permitted
+
+    // No classification stored: caller claim stands.
+    assert_approve(&client.evaluate(&policy, &token, &facts));
+
+    // Authority classifies the account as prohibited (region code 2).
+    client.set_jurisdiction(&authority, &account, &2);
+    assert_eq!(env.events().all().events().len(), 1);
+
+    // Registry is authoritative: prohibited blocks despite the claim.
+    let result = client.evaluate(&policy, &token, &facts);
+    assert_eq!(result.decision, Decision::Block.to_code());
+    assert_eq!(
+        result.reason_code,
+        ReasonCode::JurisdictionProhibited.to_code()
+    );
+
+    // Clearing drops back to the caller's claim.
+    client.clear_jurisdiction(&authority, &account);
+    assert_approve(&client.evaluate(&policy, &token, &facts));
+
+    // Unknown region codes are rejected.
+    let err = client
+        .try_set_jurisdiction(&authority, &account, &99)
+        .unwrap_err();
+    assert_eq!(err, contract_err(ContractError::InvalidRegistryData));
 }
