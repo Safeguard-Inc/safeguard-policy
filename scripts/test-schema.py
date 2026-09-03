@@ -199,6 +199,55 @@ def main() -> int:
         "jurisdiction: missing action is rejected",
     )
 
+    # 6. Standalone sanctions entry validation (the adapter output shape).
+    sanctions_schema = load(SCHEMA_DIR / "sanctions.schema.json")
+    sanctions_validator = Draft202012Validator(sanctions_schema)
+    good_entry = {
+        "subject_hash": "a" * 64,
+        "list_id": "OFAC-SDN",
+        "status": "active",
+        "dataset_version": 42,
+        "effective_at": "2024-01-15T00:00:00Z",
+        "source": "ofac",
+    }
+    check(sanctions_validator.is_valid(good_entry), "sanctions: a well-formed entry validates")
+    for label, mutate in [
+        ("subject hash not 64 hex chars", lambda e: {**e, "subject_hash": "zz"}),
+        ("unknown status", lambda e: {**e, "status": "flagged"}),
+        ("zero dataset version", lambda e: {**e, "dataset_version": 0}),
+        ("missing source", lambda e: {k: v for k, v in e.items() if k != "source"}),
+        ("extra unknown property", lambda e: {**e, "bogus": True}),
+    ]:
+        check(
+            not sanctions_validator.is_valid(mutate(good_entry)),
+            f"sanctions: {label} is rejected",
+        )
+
+    # 7. Standalone decision document validation (the audit output shape).
+    decision_schema = load(SCHEMA_DIR / "decision.schema.json")
+    decision_validator = Draft202012Validator(decision_schema)
+    good_decision = {
+        "decision": "BLOCK",
+        "policy_id": "institutional-default",
+        "policy_version": 3,
+        "rule_id": "SANCTIONS-001",
+        "reason_code": "sanctions_match",
+        "timestamp": "2024-01-15T00:00:00Z",
+    }
+    check(decision_validator.is_valid(good_decision), "decision: a well-formed document validates")
+    for label, mutate in [
+        ("unknown decision", lambda d: {**d, "decision": "MAYBE"}),
+        ("unknown reason code", lambda d: {**d, "reason_code": "vibes"}),
+        ("zero policy version", lambda d: {**d, "policy_version": 0}),
+        ("missing policy_id", lambda d: {k: v for k, v in d.items() if k != "policy_id"}),
+        ("extra unknown property", lambda d: {**d, "bogus": True}),
+        ("malformed timestamp", lambda d: {**d, "timestamp": "not-a-time"}),
+    ]:
+        check(
+            not decision_validator.is_valid(mutate(good_decision)),
+            f"decision: {label} is rejected",
+        )
+
     if failures:
         print(f"FAIL: {len(failures)} of {checks} checks failed")
         for failure in failures:
