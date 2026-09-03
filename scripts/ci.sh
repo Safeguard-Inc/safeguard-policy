@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Local full-gate runner: everything CI enforces, in one command.
 #
-#   ./scripts/ci.sh          # everything (rust + schema)
-#   ./scripts/ci.sh rust     # fmt, clippy, tests, wasm artifact build
-#   ./scripts/ci.sh schema   # schema battery, fixtures, reference policies
+#   ./scripts/ci.sh          # everything (rust + schema + typescript)
+#   ./scripts/ci.sh rust      # fmt, clippy, tests, wasm artifact build
+#   ./scripts/ci.sh schema    # schema battery, fixtures, reference policies
+#   ./scripts/ci.sh typescript # TS SDK typecheck + tests
 #
 # Exits non-zero on the first failing step.
 
@@ -42,12 +43,18 @@ schema_gate() {
         policies/examples/*.json
 }
 
+typescript_gate() {
+    echo "==> TypeScript SDK (typecheck, build, tests)"
+    (cd sdk/typescript && npm ci --no-audit --no-fund && npm test)
+}
+
 case "${1:-all}" in
-    rust)   rust_gate ;;
-    schema) schema_gate ;;
-    all)    rust_gate; schema_gate ;;
+    rust)       rust_gate ;;
+    schema)     schema_gate ;;
+    typescript) typescript_gate ;;
+    all)        rust_gate; schema_gate; typescript_gate ;;
     *)
-        echo "usage: $0 [rust|schema|all]" >&2
+        echo "usage: $0 [rust|schema|typescript|all]" >&2
         exit 2
         ;;
 esac

@@ -174,12 +174,13 @@ a thin on-chain shell** around it.
 rustup target add wasm32v1-none
 
 # The full local gate (same as CI): fmt, clippy, tests, wasm build,
-# schema battery, fixture checks
+# schema battery, fixture checks, TypeScript SDK
 ./scripts/ci.sh
 
-# Or just the Rust part / schema part
+# Or just one part
 ./scripts/ci.sh rust
 ./scripts/ci.sh schema
+./scripts/ci.sh typescript
 ```
 
 ## Using policies
