@@ -1,6 +1,8 @@
 # Rust / Cargo
 /target
 **/*.rs.bk
+# soroban-sdk testutils snapshot files
+crates/**/test_snapshots
 
 # Soroban
 .wasm-opt

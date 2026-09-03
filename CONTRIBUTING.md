@@ -19,12 +19,13 @@ Read [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md). Be excellent.
 
 ## Getting started
 
-Requires Rust 1.91+ (stable) and the `wasm32-unknown-unknown` target for
-contract builds:
+Requires Rust 1.91+ (stable) and the `wasm32v1-none` target for contract
+builds (the Soroban environment does not support `wasm32-unknown-unknown`
+on Rust 1.82+):
 
 ```bash
 rustup toolchain install stable
-rustup target add wasm32-unknown-unknown
+rustup target add wasm32v1-none
 cargo test --workspace          # unit + contract tests
 cargo fmt --all -- --check      # formatting
 cargo clippy --workspace --all-targets -- -D warnings

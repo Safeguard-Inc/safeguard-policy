@@ -168,14 +168,15 @@ a thin on-chain shell** around it.
 
 ```bash
 # Requires Rust 1.91+ (stable)
-rustup target add wasm32-unknown-unknown
+rustup target add wasm32v1-none
 
 cargo test --workspace
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 
-# Build the Soroban contract artifact
-cargo build -p safeguard-contract --target wasm32-unknown-unknown --release
+# Build the Soroban contract artifact (wasm32v1-none: the Soroban
+# environment does not support wasm32-unknown-unknown on Rust 1.82+)
+cargo build -p safeguard-contract --target wasm32v1-none --release
 ```
 
 ## Using policies

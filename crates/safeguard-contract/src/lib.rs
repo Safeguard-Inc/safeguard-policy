@@ -35,6 +35,9 @@
 #[cfg(test)]
 extern crate std;
 
+#[cfg(test)]
+mod test;
+
 mod admin;
 mod contract;
 mod error;
