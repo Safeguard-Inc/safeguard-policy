@@ -62,6 +62,11 @@ enum Command {
         #[command(subcommand)]
         command: RegistryCommand,
     },
+    /// Test a policy against the fixture subjects offline.
+    Policy {
+        #[command(subcommand)]
+        command: PolicyCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -82,6 +87,21 @@ enum RegistryCommand {
     },
 }
 
+#[derive(Subcommand)]
+enum PolicyCommand {
+    /// Evaluate every fixture subject through a policy offline.
+    Test {
+        /// Path to a policy JSON document.
+        policy: PathBuf,
+        /// Fixtures directory (defaults to policies/fixtures).
+        #[arg(long, default_value = "policies/fixtures")]
+        fixtures_dir: PathBuf,
+        /// Exit non-zero if any subject evaluates to BLOCK.
+        #[arg(long)]
+        strict: bool,
+    },
+}
+
 fn main() {
     let cli = Cli::parse();
     let result = match cli.command {
@@ -95,6 +115,14 @@ fn main() {
         Command::Registry {
             command: RegistryCommand::Inspect { path },
         } => commands::registry::run(&path),
+        Command::Policy {
+            command:
+                PolicyCommand::Test {
+                    policy,
+                    fixtures_dir,
+                    strict,
+                },
+        } => commands::policy::run(&policy, &fixtures_dir, strict),
     };
     if let Err(error) = result {
         eprintln!("error: {error:#}");
