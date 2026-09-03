@@ -1,0 +1,25 @@
+# Rust / Cargo
+/target
+**/*.rs.bk
+
+# Soroban
+.wasm-opt
+*.wasm
+!examples/**/*.wasm
+
+# Node / TypeScript
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Editors & OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
