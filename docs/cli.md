@@ -104,8 +104,13 @@ kind is auto-detected from the JSON shape:
   active/inactive split, per-list breakdown, dataset versions;
 - **identity** records (an `{ "accounts": [...] }` object) — count and
   status histogram;
+- **token bindings** (a `{ "bindings": [...] }` object) — token count per
+  policy;
 - the **region universe** (permitted/restricted/prohibited lists) — counts
-  per list.
+  per list;
+- a **dataset report** (a `{ source, entries, review }` object from
+  `dataset build`) — entry count split by active/inactive and list, plus
+  every review item's reason.
 
 Unrecognized shapes are rejected with a clear message.
 
