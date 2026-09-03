@@ -1,0 +1,13 @@
+# Toolchain pinned for the whole workspace.
+#
+# - stable channel (soroban-sdk 27 requires Rust >= 1.91)
+# - rustfmt and clippy are required by the CI gate and installed
+#   automatically for contributors who use rustup
+# - the Soroban wasm target (wasm32v1-none) is NOT a toolchain component;
+#   install it once with: rustup target add wasm32v1-none
+#   (the Soroban environment does not support wasm32-unknown-unknown on
+#   Rust 1.82+)
+[toolchain]
+channel = "stable"
+components = ["clippy", "rustfmt"]
+profile = "minimal"
