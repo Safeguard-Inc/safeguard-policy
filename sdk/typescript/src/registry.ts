@@ -62,6 +62,51 @@ export interface IdentityRecord {
 
 const G_ADDRESS = /^G[A-Z2-7]{55}$/;
 
+/**
+ * The operator-facing artifact of `safeguard dataset build` (and the Rust
+ * `safeguard_adapters::dataset::DatasetReport`): registry-ready entries
+ * plus the review items an operator must decide on before anything is
+ * pushed on-chain.
+ */
+export interface DatasetReport {
+  /** Source identifier, e.g. "ofac". */
+  source: string;
+  /** The normalized entries, ready for the registry. */
+  entries: SanctionsDatasetEntry[];
+  /** Records that could not be normalized; require operator review. */
+  review: ReviewItem[];
+}
+
+/** One record the normalizer could not map; rendered for a human. */
+export interface ReviewItem {
+  /** The raw provider record. */
+  record: string;
+  /** Why it could not be normalized. */
+  reason: string;
+}
+
+/** Structural check that a value is a well-formed dataset report. */
+export function isDatasetReport(value: unknown): value is DatasetReport {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const report = value as Partial<DatasetReport>;
+  return (
+    typeof report.source === "string" &&
+    report.source.length > 0 &&
+    Array.isArray(report.entries) &&
+    report.entries.every((entry) => isSanctionsEntry(entry)) &&
+    Array.isArray(report.review) &&
+    report.review.every(
+      (item) =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as Partial<ReviewItem>).record === "string" &&
+        typeof (item as Partial<ReviewItem>).reason === "string"
+    )
+  );
+}
+
 /** Structural check that a value is a well-formed identity record. */
 export function isIdentityRecord(value: unknown): value is IdentityRecord {
   if (typeof value !== "object" || value === null) {

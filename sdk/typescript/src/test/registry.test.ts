@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 
 import {
   decodeSubjectHash,
+  isDatasetReport,
   isIdentityRecord,
   isSanctionsEntry,
 } from "../registry";
-import type { IdentityRecord, SanctionsDatasetEntry } from "../registry";
+import type { DatasetReport, IdentityRecord, SanctionsDatasetEntry } from "../registry";
 
 const VALID: SanctionsDatasetEntry = {
   subject_hash: "c0ffee0000000000000000000000000000000000000000000000000000000000",
@@ -55,6 +56,32 @@ const IDENTITY_VALID: IdentityRecord = {
   attestation_ref: "ATT-0001",
   expires_at: 1893456000,
 };
+
+const REPORT_VALID: DatasetReport = {
+  source: "ofac",
+  entries: [VALID],
+  review: [{ record: "junk|XYZ|active", reason: "unmapped provider list code \"XYZ\"" }],
+};
+
+describe("isDatasetReport", () => {
+  it("accepts a well-formed report", () => {
+    assert.equal(isDatasetReport(REPORT_VALID), true);
+  });
+
+  it("accepts an empty review list", () => {
+    assert.equal(isDatasetReport({ ...REPORT_VALID, review: [] }), true);
+  });
+
+  it("rejects malformed reports", () => {
+    assert.equal(isDatasetReport({ ...REPORT_VALID, source: "" }), false);
+    assert.equal(isDatasetReport({ ...REPORT_VALID, entries: ["nope"] }), false);
+    assert.equal(
+      isDatasetReport({ ...REPORT_VALID, review: [{ record: "x" }] }),
+      false
+    );
+    assert.equal(isDatasetReport(null), false);
+  });
+});
 
 describe("isIdentityRecord", () => {
   it("accepts a well-formed record", () => {
