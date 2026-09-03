@@ -57,6 +57,11 @@ enum Command {
         #[command(subcommand)]
         command: FixtureCommand,
     },
+    /// Inspect a normalized registry dataset before pushing it on-chain.
+    Registry {
+        #[command(subcommand)]
+        command: RegistryCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -65,6 +70,15 @@ enum FixtureCommand {
     Validate {
         /// Fixtures directory (defaults to policies/fixtures).
         path: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+enum RegistryCommand {
+    /// Summarize a sanctions, identity or jurisdiction dataset.
+    Inspect {
+        /// Path to a registry dataset JSON document.
+        path: PathBuf,
     },
 }
 
@@ -78,6 +92,9 @@ fn main() {
         Command::Fixture {
             command: FixtureCommand::Validate { path },
         } => commands::fixture::run(path.as_deref()),
+        Command::Registry {
+            command: RegistryCommand::Inspect { path },
+        } => commands::registry::run(&path),
     };
     if let Err(error) = result {
         eprintln!("error: {error:#}");

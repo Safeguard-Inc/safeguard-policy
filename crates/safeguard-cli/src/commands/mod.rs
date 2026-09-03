@@ -3,5 +3,6 @@
 pub mod evaluate;
 pub mod fixture;
 pub mod inspect;
+pub mod registry;
 pub mod validate;
 pub mod version;
