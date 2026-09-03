@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://safeguard.dev/schemas/rule.schema.json?version=1",
+  "title": "Safeguard Rule",
+  "description": "A single compliance rule. This definition is identical to the $defs.rule embedded in policy.schema.json; scripts/test-schema.py asserts the parity so the two cannot drift.",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[ -~]*$",
+      "description": "ASCII identifier of at most 32 bytes (RuleId width in safeguard-core)."
+    },
+    "region_code": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "ISO 3166-1 alpha-2 region code, uppercase."
+    },
+    "region_lists": {
+      "type": "object",
+      "required": ["permitted", "restricted", "prohibited"],
+      "additionalProperties": false,
+      "properties": {
+        "permitted": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/region_code" },
+          "description": "Regions that may hold and transact the token."
+        },
+        "restricted": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/region_code" },
+          "description": "Regions that need review; trigger the rule action."
+        },
+        "prohibited": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/region_code" },
+          "description": "Regions that may not transact; trigger the rule action."
+        }
+      }
+    },
+    "jurisdiction_requires_regions": {
+      "if": {
+        "properties": { "type": { "const": "jurisdiction" } },
+        "required": ["type"]
+      },
+      "then": { "required": ["regions"] }
+    },
+    "non_jurisdiction_forbids_regions": {
+      "if": {
+        "properties": { "type": { "not": { "const": "jurisdiction" } } },
+        "required": ["type"]
+      },
+      "then": { "properties": { "regions": false } }
+    },
+    "rule": {
+      "description": "A single rule: stable shape mirrored by rule.schema.json (asserted by scripts/test-schema.py).",
+      "type": "object",
+      "required": ["id", "type", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "Rule id, unique within the policy version (e.g. \"SANCTIONS-001\")."
+        },
+        "type": {
+          "enum": ["allowlist", "denylist", "sanctions", "jurisdiction"],
+          "description": "Rule category; maps to safeguard_core::rule::RuleType labels."
+        },
+        "action": {
+          "enum": ["block", "flag"],
+          "description": "What the rule does when its condition is met; maps to safeguard_core::rule::RuleAction."
+        },
+        "regions": {
+          "$ref": "#/$defs/region_lists",
+          "description": "Required for jurisdiction rules; forbidden for other types. Classifies regions into permitted/restricted/prohibited; the rule action applies to restricted, prohibited and unknown regions (fail-closed)."
+        }
+      },
+      "allOf": [
+        { "$ref": "#/$defs/jurisdiction_requires_regions" },
+        { "$ref": "#/$defs/non_jurisdiction_forbids_regions" }
+      ]
+    }
+  },
+  "$ref": "#/$defs/rule"
+}
