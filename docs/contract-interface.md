@@ -4,6 +4,22 @@ The on-chain surface of `safeguard-contract`. This is the reference for
 `safeguard-hooks`, SDKs and operators; the entrypoints are implemented in
 `src/contract.rs` and delegate to the functional modules.
 
+## What the contract does — and does not
+
+The contract **stores policy configuration and evaluates subjects** against
+the active version of a bound policy. It never fetches external data: every
+fact a decision needs is represented through contract state (registered
+registries, attestation references, or caller-supplied claims resolved
+against those registries). There is no network access in the evaluation
+path, and evaluation never consults wall-clock time — decisions are
+functions of contract state plus the caller's input, nothing else.
+
+Operations (`operation_rules`) are **not** modeled on-chain: rule categories
+are allowlist, denylist, sanctions and jurisdiction (see
+`docs/rule-engine.md`). Operation-specific gating (e.g. "this rule applies
+to transfers but not to mints") belongs to `safeguard-hooks`, which decides
+*when* to invoke `evaluate` for a given token operation.
+
 ## Entrypoints
 
 ### Bootstrap and roles

@@ -19,6 +19,25 @@ All schemas target [JSON Schema draft
 2020-12](https://json-schema.org/draft/2020-12/schema) and are validated with
 the `jsonschema` Python library (see `../scripts/validate_policy.py`).
 
+## What the JSON document carries — and what it does not
+
+The policy document is the **rule-set definition**; it deliberately does not
+carry every property of the spec's policy model, because several of those
+live in the on-chain lifecycle, not in the document:
+
+| Spec concept | Where it lives | How it is expressed |
+| ------------ | -------------- | ------------------- |
+| Rule **priority** | Document (`rules` array) + engine | Rules are evaluated in fixed precedence order — `allowlist, denylist, sanctions, jurisdiction` — not by a numeric priority field (see `docs/rule-engine.md`). The array order is the *presentation* order; the precedence is normative. |
+| **Registry references** | Rule configuration | `jurisdiction.schema.json` carries region classification; `sanctions.schema.json` carries the subject-hash/list/status shape that registries store. Allowlist/denylist are membership facts supplied at evaluation time, so the document carries the rule, not the membership list. |
+| **Token scope** | Contract (`bind_token` / `bound_tokens`) | A policy applies only to tokens explicitly bound on-chain; the document does not name tokens (`docs/contract-interface.md`, token registry). |
+| **Activation state** | Contract lifecycle | A version becomes active only via `activate_version`; the document has no "active" flag (`docs/versioning.md`). Draft documents validate; whether they govern is an on-chain state. |
+
+This split is intentional: the JSON is the stable, portable rule-set
+interface, and the contract owns the *state* (which version is active, which
+tokens are covered).
+
+## Files
+
 ## Compatibility contract
 
 The schema is part of the **versioned interface** between the Safeguard
