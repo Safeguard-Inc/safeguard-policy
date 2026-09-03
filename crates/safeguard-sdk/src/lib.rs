@@ -14,6 +14,7 @@
 
 pub mod evaluate;
 pub mod model;
+pub mod registry;
 pub mod validation;
 
 /// The SDK crate version (compile-time metadata for downstream tools).
