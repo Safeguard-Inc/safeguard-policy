@@ -1647,6 +1647,7 @@ dependencies = [
 name = "safeguard-sdk"
 version = "0.1.0"
 dependencies = [
+ "proptest",
  "safeguard-core",
  "serde",
  "serde_json",
