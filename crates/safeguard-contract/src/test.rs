@@ -94,13 +94,15 @@ fn bound_and_active(
     client.bind_token(admin, policy, token);
 }
 
-fn active_input() -> EvaluationInput {
+fn active_input(env: &Env, account: &Address) -> EvaluationInput {
     EvaluationInput {
         account_status: 0, // active
         allowlist_member: true,
         denylist_matched: false,
         sanctions_matched: false,
         jurisdiction: 0, // permitted
+        subject: BytesN::from_array(env, &[1; 32]),
+        account: account.clone(),
     }
 }
 
@@ -277,7 +279,7 @@ fn approve_when_every_check_passes() {
     let (admin, _, _, token, policy, client) = setup(&env);
     bound_and_active(&env, &client, &admin, &policy, &token);
 
-    let result = client.evaluate(&policy, &token, &active_input());
+    let result = client.evaluate(&policy, &token, &active_input(&env, &admin));
     assert_eq!(result.policy_version, 1);
     assert_approve(&result);
 }
@@ -288,7 +290,7 @@ fn allowlist_denies_non_members_with_the_rule_id() {
     let (admin, _, _, token, policy, client) = setup(&env);
     bound_and_active(&env, &client, &admin, &policy, &token);
 
-    let mut facts = active_input();
+    let mut facts = active_input(&env, &admin);
     facts.allowlist_member = false;
     let result = client.evaluate(&policy, &token, &facts);
     assert_eq!(result.decision, Decision::Block.to_code());
@@ -302,7 +304,7 @@ fn sanctions_matches_block_under_a_blocking_policy() {
     let (admin, _, _, token, policy, client) = setup(&env);
     bound_and_active(&env, &client, &admin, &policy, &token);
 
-    let mut facts = active_input();
+    let mut facts = active_input(&env, &admin);
     facts.sanctions_matched = true;
     let result = client.evaluate(&policy, &token, &facts);
     assert_eq!(result.decision, Decision::Block.to_code());
@@ -327,7 +329,7 @@ fn flag_actions_flag_instead_of_blocking() {
     client.activate_version(&policy, &1);
     client.bind_token(&admin, &policy, &token);
 
-    let mut facts = active_input();
+    let mut facts = active_input(&env, &admin);
     facts.sanctions_matched = true;
     let result = client.evaluate(&policy, &token, &facts);
     assert_eq!(result.decision, Decision::Flag.to_code());
@@ -340,7 +342,7 @@ fn frozen_accounts_block_even_when_rules_would_pass() {
     let (admin, _, _, token, policy, client) = setup(&env);
     bound_and_active(&env, &client, &admin, &policy, &token);
 
-    let mut facts = active_input();
+    let mut facts = active_input(&env, &admin);
     facts.account_status = 2; // frozen
     let result = client.evaluate(&policy, &token, &facts);
     assert_eq!(result.decision, Decision::Block.to_code());
@@ -354,7 +356,7 @@ fn unknown_status_codes_fail_closed_to_flag() {
     let (admin, _, _, token, policy, client) = setup(&env);
     bound_and_active(&env, &client, &admin, &policy, &token);
 
-    let mut facts = active_input();
+    let mut facts = active_input(&env, &admin);
     facts.account_status = 99; // invalid account status code
     let result = client.evaluate(&policy, &token, &facts);
     assert_eq!(result.decision, Decision::Flag.to_code());
@@ -370,7 +372,7 @@ fn evaluation_is_deterministic() {
     let (admin, _, _, token, policy, client) = setup(&env);
     bound_and_active(&env, &client, &admin, &policy, &token);
 
-    let mut facts = active_input();
+    let mut facts = active_input(&env, &admin);
     facts.denylist_matched = true;
     let first = client.evaluate(&policy, &token, &facts);
     for _ in 0..16 {
@@ -387,7 +389,7 @@ fn scope_guards_refuse_evaluation_outside_the_policy() {
     client.bind_token(&admin, &policy, &token);
     assert_eq!(
         client
-            .try_evaluate(&policy, &token, &active_input())
+            .try_evaluate(&policy, &token, &active_input(&env, &admin))
             .unwrap_err(),
         contract_err(ContractError::PolicyNotActive)
     );
@@ -398,12 +400,12 @@ fn scope_guards_refuse_evaluation_outside_the_policy() {
     let other_token = Address::generate(&env);
     assert_eq!(
         client
-            .try_evaluate(&policy, &other_token, &active_input())
+            .try_evaluate(&policy, &other_token, &active_input(&env, &admin))
             .unwrap_err(),
         contract_err(ContractError::TokenNotBound)
     );
 
     // After binding, evaluation succeeds.
     client.bind_token(&admin, &policy, &token);
-    assert_approve(&client.evaluate(&policy, &token, &active_input()));
+    assert_approve(&client.evaluate(&policy, &token, &active_input(&env, &admin)));
 }

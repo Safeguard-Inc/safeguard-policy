@@ -5,9 +5,12 @@
 //!
 //! 1. Resolve the policy's **active version** record (fail: no active policy).
 //! 2. Check the token is **bound** to the policy (fail: not covered).
-//! 3. Translate the caller's facts (`EvaluationInput`) plus the active
-//!    version's rules into a [`safeguard_core::evaluation::EvaluationRequest`].
-//! 4. Run the core engine and map its decision back into Soroban values.
+//! 3. Resolve authoritative facts from the on-chain registries where entries
+//!    exist (sanctions match, jurisdiction), falling back to the caller's
+//!    claims otherwise.
+//! 4. Translate the resolved facts plus the active version's rules into a
+//!    [`safeguard_core::evaluation::EvaluationRequest`].
+//! 5. Run the core engine and map its decision back into Soroban values.
 //!
 //! The contract never interprets rule semantics itself — the core engine
 //! decides. The contract only owns state, scope and translation.
@@ -39,6 +42,14 @@ use safeguard_core::rules::jurisdiction::RegionStatus;
 /// flags are raw booleans for membership/matches. Rule configuration (which
 /// categories are enabled, with which actions) comes from the active policy
 /// version, never from the caller.
+///
+/// # Registry resolution
+///
+/// Where a deployment maintains the on-chain registries, `evaluate` resolves
+/// two facts authoritatively instead of trusting the caller: the sanctions
+/// match (from the subject hash's entry) and the jurisdiction classification
+/// (from the account's stored region). Caller claims are the fallback when no
+/// entry exists, so deployments without registries behave exactly as before.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EvaluationInput {
@@ -49,10 +60,18 @@ pub struct EvaluationInput {
     pub allowlist_member: bool,
     /// Whether the subject matched the denylist.
     pub denylist_matched: bool,
-    /// Whether the subject matched sanctions screening.
+    /// Caller claim: whether the subject matched sanctions screening. Overridden
+    /// by the on-chain sanctions registry when an entry exists for
+    /// [`Self::subject`].
     pub sanctions_matched: bool,
-    /// [`safeguard_core::rules::jurisdiction::RegionStatus`] code.
+    /// [`safeguard_core::rules::jurisdiction::RegionStatus`] code. Overridden
+    /// by the on-chain jurisdiction registry when a classification exists for
+    /// [`Self::account`].
     pub jurisdiction: u32,
+    /// 32-byte subject reference (hash) used for sanctions-registry lookup.
+    pub subject: Id,
+    /// The transacting account, used for jurisdiction-registry lookup.
+    pub account: Address,
 }
 
 /// The on-chain result of an evaluation.
@@ -94,12 +113,44 @@ fn decode_rule(
     Ok((rule_id, rule_type, action))
 }
 
-/// Assemble the core evaluation request from the active version's rules and
-/// the caller's facts.
+/// Resolve the sanctions match flag for a subject.
+///
+/// The on-chain registry is authoritative when an entry exists: an active
+/// entry means the subject matches; an inactive (retired) entry means it
+/// does not. Without an entry the caller's claim is used, so deployments
+/// without a registry behave exactly as before.
+fn resolve_sanctions(env: &Env, input: &EvaluationInput) -> bool {
+    match storage::sanctions_entry(env, &input.subject) {
+        Some(record) => {
+            record.status
+                == safeguard_core::registries::sanctions::SanctionsStatus::Active.to_code()
+        }
+        None => input.sanctions_matched,
+    }
+}
+
+/// Resolve the jurisdiction classification for an account.
+///
+/// The on-chain registry is authoritative when a classification exists;
+/// otherwise the caller's region code is used (decoded fail-closed to
+/// `Unknown` when malformed).
+fn resolve_jurisdiction(env: &Env, input: &EvaluationInput) -> RegionStatus {
+    match storage::jurisdiction(env, &input.account) {
+        Some(code) => decode_region(code),
+        None => decode_region(input.jurisdiction),
+    }
+}
+
+/// Assemble the core evaluation request from the active version's rules,
+/// the caller's facts, and the on-chain registries where authoritative.
 fn assemble(
+    env: &Env,
     record: &PolicyVersionRecord,
     input: &EvaluationInput,
 ) -> Result<EvaluationRequest, ContractError> {
+    let sanctions_matched = resolve_sanctions(env, input);
+    let jurisdiction = resolve_jurisdiction(env, input);
+
     let mut request = EvaluationRequest {
         account_status: decode_status(input.account_status),
         ..EvaluationRequest::default()
@@ -126,14 +177,14 @@ fn assemble(
                 request.sanctions = Some(MatchCheck {
                     rule_id,
                     action,
-                    matched: input.sanctions_matched,
+                    matched: sanctions_matched,
                 });
             }
             RuleType::Jurisdiction => {
                 request.jurisdiction = Some(JurisdictionCheck {
                     rule_id,
                     action,
-                    region: decode_region(input.jurisdiction),
+                    region: jurisdiction,
                 });
             }
         }
@@ -174,7 +225,7 @@ pub fn evaluate(
     let record =
         storage::version_record(env, policy_id, active).ok_or(ContractError::VersionNotFound)?;
 
-    let request = assemble(&record, input)?;
+    let request = assemble(env, &record, input)?;
     let decision = safeguard_core::evaluator::evaluate(&request);
     Ok(to_result(env, active, decision))
 }
