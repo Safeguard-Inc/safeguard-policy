@@ -4,6 +4,14 @@ This document walks evaluation end to end using the reference policies and
 fixtures in `policies/`. Everything here is deterministic and reproducible:
 given the policy document and the account facts, the decision is fixed.
 
+Every case below is machine-checked in three places: offline through the
+Rust SDK (`crates/safeguard-sdk/tests/shipped_policies.rs`), at the
+**contract** level against the registered shipped policy
+(`crates/safeguard-contract/src/test.rs`, `shipped_combined_policy_enforces_the_documented_cases`),
+and against the golden decision documents
+(`crates/safeguard-sdk/tests/fixtures/decisions.json`). If a case ever stops
+holding, one of those suites fails first.
+
 ## Setup
 
 Deploy and initialize the contract, then register and activate the
@@ -23,6 +31,14 @@ prohibited:  CU IR KP SY VE
 ```
 
 Bind the token, then evaluate subjects from `policies/fixtures/accounts.json`.
+
+The contract entrypoint is `evaluate(policy_id, token, input)` where `input`
+carries the facts below plus the `subject` hash and `account` that key the
+on-chain registries. Where a deployment maintains the registries, the
+sanctions match and jurisdiction classification are resolved from them
+authoritatively (an active sanctions entry for the subject hash always
+matches; a stored region always wins), so the facts shown here are the
+**claims** `evaluate` starts from — the registry, when present, overrides.
 
 ## Case 1 — everything passes → APPROVE
 
