@@ -15,6 +15,10 @@ dist/
 build/
 *.tsbuildinfo
 
+# Python
+**/__pycache__/
+*.pyc
+
 # Environment & secrets
 .env
 .env.*

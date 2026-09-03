@@ -36,6 +36,6 @@ Region codes are ISO 3166-1 alpha-2, uppercase.
 
 1. Copy this policy, adjust rule severities and region lists for your
    jurisdiction.
-2. Validate: `python3 scripts/validate-policy.py path/to/your/policy.json`.
+2. Validate: `python3 scripts/validate_policy.py path/to/your/policy.json`.
 3. Register and activate it on the policy contract (admin), then bind your
    token addresses (admin or registry authority).

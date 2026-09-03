@@ -17,7 +17,7 @@ CLIs when they build requests — speaks the shapes defined here.
 
 All schemas target [JSON Schema draft
 2020-12](https://json-schema.org/draft/2020-12/schema) and are validated with
-the `jsonschema` Python library (see `../scripts/validate-policy.py`).
+the `jsonschema` Python library (see `../scripts/validate_policy.py`).
 
 ## Compatibility contract
 
@@ -49,7 +49,7 @@ commit.
 
 ```bash
 # One or more policy documents
-python3 scripts/validate-policy.py policies/default/policy.json policies/examples/*.json
+python3 scripts/validate_policy.py policies/default/policy.json policies/examples/*.json
 
 # The whole test battery (positive, negative and parity cases)
 python3 scripts/test-schema.py

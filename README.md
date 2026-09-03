@@ -185,7 +185,7 @@ Reference policies live under [`policies/`](policies/):
 
 ```bash
 # Validate a policy document against the JSON Schema
-python3 scripts/validate-policy.py policies/default/policy.json
+python3 scripts/validate_policy.py policies/default/policy.json
 ```
 
 - [`policies/default/policy.json`](policies/default/policy.json) — the

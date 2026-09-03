@@ -15,7 +15,7 @@ jurisdiction.schema.json so the embedded config cannot drift from the
 published shape.
 
 Usage:
-    python3 scripts/validate-policy.py policy1.json [policy2.json ...]
+    python3 scripts/validate_policy.py policy1.json [policy2.json ...]
 
 Exits non-zero if any document is invalid. Can also be imported; use
 `validate_policy_document(doc) -> list[str]`.
