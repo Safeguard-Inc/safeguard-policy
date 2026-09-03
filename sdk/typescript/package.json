@@ -3,15 +3,31 @@
   "version": "0.1.0",
   "description": "TypeScript SDK for Safeguard policy documents: types, invariant validation and decision-document helpers",
   "license": "Apache-2.0",
-  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Safeguard-Inc/safeguard-policy"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/decision.js",
+    "dist/decision.d.ts",
+    "dist/registry.js",
+    "dist/registry.d.ts",
+    "dist/types.js",
+    "dist/types.d.ts",
+    "dist/validate.js",
+    "dist/validate.d.ts"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test \"dist/test/*.test.js\""
+    "test": "npm run build && node --test \"dist/test/*.test.js\"",
+    "prepublishOnly": "npm test"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
