@@ -344,6 +344,28 @@ fn registry_inspect_summarizes_each_dataset_kind() {
     assert!(ok);
     assert!(stdout.contains("token registry"));
     assert!(stdout.contains("institutional-default"));
+
+    // A `dataset build` report summarizes entries + review items.
+    let report = temp_file(
+        "report.json",
+        r#"{"source":"ofac","entries":[{
+            "subject_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+            "list_id": "OFAC-SDN",
+            "status": "active",
+            "dataset_version": 1,
+            "effective_at": "2023-06-01T00:00:00Z",
+            "source": "ofac"
+        }],"review":[{
+            "record": "junk|XYZ|active|2023-01-01",
+            "reason": "unmapped provider list code \"XYZ\""
+        }]}"#,
+    );
+    let (ok, stdout, _) = run(&["registry", "inspect", report.to_str().unwrap()]);
+    assert!(ok);
+    assert!(stdout.contains("dataset report"));
+    assert!(stdout.contains("1 entries (1 active"));
+    assert!(stdout.contains("1 review items"));
+    assert!(stdout.contains("unmapped provider list code"));
 }
 
 #[test]

@@ -7,7 +7,9 @@
 //! * an object with an `accounts` array (identity verification records);
 //! * an object with a `bindings` array (policy -> token registry bindings);
 //! * an object with permitted/restricted/prohibited lists (the region
-//!   universe fixture).
+//!   universe fixture);
+//! * a `safeguard dataset build` report (`{source, entries, review}`),
+//!   summarized with its review items before the entries are pushed.
 //!
 //! The output is a summary an operator can eyeball before handing the data
 //! to the contract's registry entrypoints.
@@ -41,10 +43,67 @@ pub fn run(path: &Path) -> Result<()> {
     if object.contains_key("permitted") {
         return inspect_jurisdiction(object);
     }
+    if object.contains_key("entries") && object.contains_key("review") {
+        return inspect_dataset_report(object);
+    }
     bail!(
-        "{}: unrecognized dataset shape (expected sanctions entries, an accounts list, token bindings, or region lists)",
+        "{}: unrecognized dataset shape (expected sanctions entries, an accounts list, token bindings, region lists, or a dataset report)",
         path.display()
     )
+}
+
+/// Summarize a `safeguard dataset build` report: the entries that would be
+/// pushed plus the review items requiring an operator decision.
+fn inspect_dataset_report(object: &serde_json::Map<String, Value>) -> Result<()> {
+    let source = object
+        .get("source")
+        .and_then(Value::as_str)
+        .with_context(|| "dataset report missing source")?;
+    let entries = object
+        .get("entries")
+        .and_then(Value::as_array)
+        .with_context(|| "dataset report `entries` must be an array")?;
+    let review = object
+        .get("review")
+        .and_then(Value::as_array)
+        .with_context(|| "dataset report `review` must be an array")?;
+
+    let mut active = 0usize;
+    let mut inactive = 0usize;
+    let mut lists = std::collections::BTreeMap::new();
+    for entry in entries {
+        match entry.get("status").and_then(Value::as_str) {
+            Some("active") => active += 1,
+            Some("inactive") => inactive += 1,
+            _ => bail!("dataset entry missing a known status"),
+        }
+        if let Some(list) = entry.get("list_id").and_then(Value::as_str) {
+            *lists.entry(list.to_owned()).or_insert(0usize) += 1;
+        }
+    }
+
+    println!(
+        "dataset report (source {source}): {} entries ({active} active, {inactive} inactive), {} review items",
+        entries.len(),
+        review.len()
+    );
+    let lists_summary = lists
+        .iter()
+        .map(|(list, count)| format!("{list} ({count})"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    println!("  lists: {lists_summary}");
+    if !review.is_empty() {
+        println!("  review items (operator decision required before pushing):");
+        for item in review {
+            let reason = item
+                .get("reason")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+            println!("    - {reason}");
+        }
+    }
+    Ok(())
 }
 
 fn inspect_sanctions(entries: &[Value]) -> Result<()> {
