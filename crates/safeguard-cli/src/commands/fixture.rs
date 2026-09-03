@@ -18,7 +18,7 @@ pub fn run(path: Option<&Path>) -> Result<()> {
 
     let sets =
         fixtures::load(dir).with_context(|| format!("loading fixtures from {}", dir.display()))?;
-    let problems = fixtures::validate(&sets);
+    let problems = fixtures::validate(dir, &sets);
 
     if problems.is_empty() {
         println!(

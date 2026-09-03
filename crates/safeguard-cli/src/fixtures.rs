@@ -182,7 +182,7 @@ fn load_optional<T: serde::de::DeserializeOwned>(dir: &Path, name: &str) -> Resu
 }
 
 /// Validate every fixture dataset; returns a list of problems (empty = ok).
-pub fn validate(sets: &FixtureSets) -> Vec<String> {
+pub fn validate(dir: &Path, sets: &FixtureSets) -> Vec<String> {
     let mut problems = Vec::new();
 
     // Region universe: uppercase alpha-2, no duplicates, no cross-list
@@ -294,7 +294,10 @@ pub fn validate(sets: &FixtureSets) -> Vec<String> {
         }
     }
 
-    // Token bindings: well-formed address, non-empty policy id.
+    // Token bindings: well-formed address, non-empty policy id, and the
+    // policy must exist among the shipped reference policies (same rule as
+    // scripts/check-fixtures.py, so the two gates cannot disagree).
+    let shipped_policies = shipped_policy_ids(dir);
     for binding in &sets.tokens {
         if binding.policy_id.is_empty() {
             problems.push("tokens: binding with an empty policy_id".to_owned());
@@ -305,9 +308,51 @@ pub fn validate(sets: &FixtureSets) -> Vec<String> {
                 binding.token
             ));
         }
+        if let Some(policy_ids) = &shipped_policies {
+            if !policy_ids.contains(&binding.policy_id) {
+                problems.push(format!(
+                    "tokens: policy {:?} has no shipped policy document",
+                    binding.policy_id
+                ));
+            }
+        }
     }
 
     problems
+}
+
+/// The `policy_id`s of the reference policies shipped next to the fixtures
+/// directory (`../default` and `../examples`). `None` when the fixtures
+/// directory is not inside a repository checkout (e.g. a temp dir), in
+/// which case the existence cross-check is skipped.
+fn shipped_policy_ids(dir: &Path) -> Option<std::collections::BTreeSet<String>> {
+    let mut ids = std::collections::BTreeSet::new();
+    for relative in ["../default", "../examples"] {
+        let directory = dir.join(relative);
+        let entries = std::fs::read_dir(&directory).ok()?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+                continue;
+            }
+            let Ok(raw) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            let Ok(document) = serde_json::from_str::<serde_json::Value>(&raw) else {
+                continue;
+            };
+            if let Some(id) = document
+                .get("policy_id")
+                .and_then(serde_json::Value::as_str)
+            {
+                ids.insert(id.to_owned());
+            }
+        }
+    }
+    if ids.is_empty() {
+        return None;
+    }
+    Some(ids)
 }
 
 /// An uppercase ISO 3166-1 alpha-2 region code.

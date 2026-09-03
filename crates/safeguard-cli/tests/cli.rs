@@ -204,6 +204,73 @@ fn fixture_validate_accepts_the_shipped_fixtures() {
     assert!(stdout.contains("OK:"));
     assert!(stdout.contains("accounts"));
     assert!(stdout.contains("sanctions entries"));
+    assert!(stdout.contains("identity records"));
+    assert!(stdout.contains("token bindings"));
+}
+
+#[test]
+fn fixture_validate_rejects_a_token_binding_for_an_unknown_policy() {
+    // Same rule as scripts/check-fixtures.py: a token binding must reference
+    // a shipped reference policy. The temp dir has no ../default or
+    // ../examples siblings, so the cross-check is skipped there; run against
+    // a copy of the shipped fixtures plus a bogus binding instead.
+    let dir = temp_dir_with(
+        "fixture-unknown-policy",
+        &[
+            ("accounts.json", r#"{"accounts": []}"#),
+            (
+                "jurisdictions.json",
+                r#"{"permitted": ["US"], "restricted": [], "prohibited": []}"#,
+            ),
+            (
+                "tokens.json",
+                r#"{"bindings": [{
+                    "policy_id": "no-such-policy",
+                    "token": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+                }]}"#,
+            ),
+        ],
+    );
+    // In a bare temp dir the shipped-policy cross-check is skipped, so the
+    // dataset must still validate (shape is fine).
+    let (ok, _, stderr) = run(&["fixture", "validate", dir.to_str().unwrap()]);
+    assert!(ok, "bare temp dir must validate: {stderr}");
+
+    // The shipped fixtures directory is inside the repo, so a bogus binding
+    // added there would fail the cross-check. Exercise the check against the
+    // real repo layout via a sibling-directory probe: point the command at a
+    // fixtures dir that has ../default and ../examples.
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let probe = repo_root.join("target/fixture-probe");
+    let _ = std::fs::remove_dir_all(&probe);
+    std::fs::create_dir_all(probe.join("fixtures")).unwrap();
+    std::fs::write(probe.join("fixtures/accounts.json"), r#"{"accounts": []}"#).unwrap();
+    std::fs::write(
+        probe.join("fixtures/jurisdictions.json"),
+        r#"{"permitted": ["US"], "restricted": [], "prohibited": []}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        probe.join("fixtures/tokens.json"),
+        r#"{"bindings": [{
+            "policy_id": "no-such-policy",
+            "token": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+        }]}"#,
+    )
+    .unwrap();
+    std::fs::create_dir_all(probe.join("default")).unwrap();
+    std::fs::create_dir_all(probe.join("examples")).unwrap();
+    std::fs::write(probe.join("default/policy.json"), VALID_POLICY).unwrap();
+    std::fs::write(probe.join("examples/example.json"), VALID_POLICY).unwrap();
+
+    let (ok, _, stderr) = run(&[
+        "fixture",
+        "validate",
+        probe.join("fixtures").to_str().unwrap(),
+    ]);
+    assert!(!ok);
+    assert!(stderr.contains("no shipped policy document"));
+    let _ = std::fs::remove_dir_all(&probe);
 }
 
 #[test]
