@@ -2,10 +2,14 @@
 //!
 //! Roles follow `docs/security.md`:
 //!
-//! * **Admin** — bootstrap, change the admin, manage authorities, and drive
-//!   the policy lifecycle (create/activate/deactivate versions).
-//! * **Registry authority** — manages the policy↔token registry; added and
-//!   removed only by the admin.
+//! * **Admin** — bootstrap, change the admin, manage both authority sets,
+//!   and create policy versions.
+//! * **Policy authority** — activates and deactivates policy versions
+//!   (the spec's separation of *creating* a version from *promoting* it to
+//!   active, so no single role can both write rules and ship them); added
+//!   and removed only by the admin.
+//! * **Registry authority** — manages the policy↔token registry and the
+//!   compliance registries; added and removed only by the admin.
 //! * **Everyone else** — read-only (queries) or subject to evaluation.
 //!
 //! Every state-changing function authenticates the acting address with
@@ -101,6 +105,76 @@ pub fn is_admin_or_authority(env: &Env, address: &Address) -> bool {
         return true;
     }
     storage::authorities(env).contains(address)
+}
+
+/// The current policy authorities.
+pub fn get_policy_authorities(env: &Env) -> Vec<Address> {
+    storage::policy_authorities(env)
+}
+
+/// Add a policy authority. Only the admin may do this.
+///
+/// Publishes a [`crate::events::PolicyAuthorityAdded`] event when the set
+/// actually changes.
+pub fn add_policy_authority(env: &Env, authority: &Address) -> Result<(), ContractError> {
+    let current = storage::admin(env)?;
+    current.require_auth();
+
+    let mut list = storage::policy_authorities(env);
+    if !list.contains(authority) {
+        list.push_back(authority.clone());
+        storage::set_policy_authorities(env, &list);
+        crate::events::policy_authority_added(env, authority);
+    }
+    Ok(())
+}
+
+/// Remove a policy authority. Only the admin may do this.
+///
+/// Publishes a [`crate::events::PolicyAuthorityRemoved`] event when an
+/// address was actually removed.
+pub fn remove_policy_authority(env: &Env, authority: &Address) -> Result<(), ContractError> {
+    let current = storage::admin(env)?;
+    current.require_auth();
+
+    let list = storage::policy_authorities(env);
+    let mut filtered: Vec<Address> = vec![env];
+    let mut removed = false;
+    for entry in list.iter() {
+        if &entry != authority {
+            filtered.push_back(entry);
+        } else {
+            removed = true;
+        }
+    }
+    if removed {
+        storage::set_policy_authorities(env, &filtered);
+        crate::events::policy_authority_removed(env, authority);
+    }
+    Ok(())
+}
+
+/// Whether an address is the admin or a policy authority.
+pub fn is_admin_or_policy_authority(env: &Env, address: &Address) -> bool {
+    if is_admin(env, address) {
+        return true;
+    }
+    storage::policy_authorities(env).contains(address)
+}
+
+/// Authenticate an address that must be the admin or a policy authority.
+///
+/// Mirrors [`require_admin_or_authority`]: membership is checked before
+/// `require_auth`, so a non-member cannot even attempt authorization.
+pub fn require_admin_or_policy_authority(
+    env: &Env,
+    declared: &Address,
+) -> Result<Address, ContractError> {
+    if !is_admin_or_policy_authority(env, declared) {
+        return Err(ContractError::Unauthorized);
+    }
+    declared.require_auth();
+    Ok(declared.clone())
 }
 
 /// Authenticate an address that must be the admin.
