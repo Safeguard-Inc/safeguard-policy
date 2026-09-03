@@ -89,17 +89,31 @@ and an announced migration:
 
 ## Publishing crates and packages
 
-The release workflow produces and attaches artifacts but does **not** push
-to crates.io or npm — the repository is not yet registered on either.
-Before that step is enabled:
+The release workflow publishes to the registries **in dependency order**
+when the tag's gate passes:
 
-- `crates/safeguard-core` must stay dependency-free and `no_std` on crates.io
-  (it currently is; that is a published-surface guarantee).
-- The TypeScript SDK must be unpublished (`"private": true` today) until its
-  API is stabilized.
+| Registry | Packages | Order | Token secret |
+| -------- | -------- | ----- | ------------ |
+| crates.io | `safeguard-core` → `safeguard-sdk` → `safeguard-adapters` → `safeguard-cli` | strict (each depends on the previous) | `CARGO_REGISTRY_TOKEN` |
+| npm | `@safeguard/policy-sdk` | — | `NPM_TOKEN` |
 
-Publishing to registries is tracked on the roadmap as part of the release
-automation phase.
+The publish jobs are **opt-in per registry**: a job runs only when its token
+secret is configured on the repository (`secrets.* != ''`), so a repository
+can ship GitHub releases without registry access and enable publishing later
+without touching the workflow.
+
+Published-surface guarantees:
+
+- `safeguard-core` is dependency-free and `no_std` — a published-surface
+  guarantee that holds on crates.io, not just in this workspace.
+- The TypeScript SDK publishes only library outputs: `files` lists the
+  compiled `dist` modules explicitly, so test artifacts never ship; it is
+  scoped `@safeguard/policy-sdk` with `publishConfig.access: public`.
+- Internal workspace deps declare both `path` and `version`, so `cargo
+  publish` resolves them from the registry instead of the checkout.
+
+Releases are tagged `vX.Y.Z`; the crates and the npm package version together
+with the tag (bump all before tagging — see the checklist above).
 
 ## Rollback
 
