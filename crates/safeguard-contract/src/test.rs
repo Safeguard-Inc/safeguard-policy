@@ -499,6 +499,61 @@ fn identity_registry_lifecycle_and_events() {
     assert_eq!(err, contract_err(ContractError::Unauthorized));
 }
 
+/// Role mutations publish AuthorityAdded/AuthorityRemoved events — and only
+/// when the set actually changes — so audit can prove who held the registry
+/// authority role when.
+#[test]
+fn authority_changes_publish_events_only_on_real_changes() {
+    use soroban_sdk::xdr::ContractEventBody;
+    use soroban_sdk::Symbol;
+    use soroban_sdk::TryFromVal as _;
+
+    fn event_identity(env: &Env, event: &soroban_sdk::xdr::ContractEvent) -> (Symbol, Address) {
+        // V0 is the only event-body variant in the current XDR; the pattern
+        // is irrefutable, so no match arm is needed.
+        let ContractEventBody::V0(v0) = &event.body;
+        let name: Symbol = Symbol::try_from_val(env, &v0.topics[0]).expect("symbol topic");
+        let emitted: Address = Address::try_from_val(env, &v0.topics[1]).expect("address topic");
+        (name, emitted)
+    }
+
+    let env = Env::default();
+    let (_, _, _, _, _, client) = setup(&env);
+
+    // Adding a new authority publishes one AuthorityAdded event naming it.
+    // (setup() already registered `authority`, so use a fresh address.)
+    let newcomer = Address::generate(&env);
+    client.add_authority(&newcomer);
+    let all_events = env.events().all();
+    assert_eq!(all_events.events().len(), 1);
+    assert_eq!(
+        event_identity(&env, &all_events.events()[0]),
+        (Symbol::new(&env, "authority_added"), newcomer.clone())
+    );
+
+    // Re-adding the same authority is a no-op: no event.
+    client.add_authority(&newcomer);
+    assert_eq!(env.events().all().events().len(), 0);
+
+    // Removing the newcomer publishes AuthorityRemoved with its address.
+    client.remove_authority(&newcomer);
+    let all_events = env.events().all();
+    assert_eq!(all_events.events().len(), 1);
+    assert_eq!(
+        event_identity(&env, &all_events.events()[0]),
+        (Symbol::new(&env, "authority_removed"), newcomer.clone())
+    );
+
+    // Removing a non-member (never added) is a no-op: no event.
+    let stranger = Address::generate(&env);
+    client.remove_authority(&stranger);
+    assert_eq!(env.events().all().events().len(), 0);
+
+    // (Role-mutation authorization itself is enforced by require_auth on the
+    // stored admin; under mock_all_auths the host cannot distinguish callers,
+    // so the auth assertion lives with the real-auth admin tests instead.)
+}
+
 /// An active sanctions entry makes evaluate block even when the caller
 /// claims no match; retiring the entry restores the caller-claim behavior.
 #[test]
