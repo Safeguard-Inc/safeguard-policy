@@ -140,9 +140,12 @@ The repository follows the phased plan from the original proposal:
 | 1 | Foundation: policy types, schema, policy contract, versioning | ✅ |
 | 2 | Core rules: allowlist, denylist, sanctions, jurisdiction, account status | ✅ |
 | 3 | Evaluation: deterministic APPROVE/BLOCK/FLAG engine | ✅ |
-| 4 | Registries: identity, sanctions, jurisdiction, token scope (contract wiring) | pending |
-| 5 | Developer tooling: Rust/TypeScript SDKs, CLI, fixture generation | pending |
-| 6 | Hardening: fuzzing, compatibility tests against `safeguard-hooks`, testnet deployment | in progress (docs + CI) |
+| 4 | Registries: identity, sanctions, jurisdiction, token scope (contract wiring) | ✅ |
+| 5 | Developer tooling: Rust/TypeScript SDKs, CLI, fixture generation | ✅ |
+| 6 | Hardening: fuzzing, compatibility gates, dependency security, release pipeline | ✅ |
+| 7 | Adapters: sanctions/identity/jurisdiction pipelines + `dataset build` CLI | ✅ |
+| 8 | Deployment: testnet runbooks + upgrade rehearsal drill | ✅ (offline-validated; live run requires network) |
+| 9 | Cross-repo: `safeguard-hooks` CI, mainnet rollout | pending (needs the hooks polyrepo) |
 
 ## Where each concept lives
 

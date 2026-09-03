@@ -66,11 +66,13 @@ compatible; consumers must ignore unknown properties.
 tooling (replay registration/bindings or export/import), run compatibility
 tests, switch hooks to the new address. Rollback is re-pointing hooks at the
 old instance; on-chain state that used the new layout must be migrated back.
-Testnet rehearsal is required.
+Testnet rehearsal is required — see [`deployment.md`](deployment.md) and
+the `scripts/deploy-testnet.sh` / `scripts/rehearse-upgrade.sh` runbooks.
 
 ## See also
 
 - [`policy-model.md`](policy-model.md) — policy version lifecycle
 - [`contract-interface.md`](contract-interface.md) — `schema_version` and entrypoints
+- [`deployment.md`](deployment.md) — testnet deploy and upgrade drills
 - `../policy-schema/README.md` — schema compatibility contract
 - `../CHANGELOG.md` — per-release changes
