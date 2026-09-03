@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://safeguard.dev/schemas/sanctions.schema.json?version=1",
+  "title": "Safeguard Sanctions Dataset Entry",
+  "description": "One normalized sanctions record as produced by a source adapter. Safeguard is not an official sanctions-data provider: external datasets enter through adapters that convert source records into this deterministic shape, which registries and the policy engine can consume. Records are keyed by a 32-byte subject hash so no personal data is stored on-chain.",
+  "type": "object",
+  "required": ["subject_hash", "list_id", "status", "dataset_version", "effective_at", "source"],
+  "additionalProperties": false,
+  "properties": {
+    "subject_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 (hex) of the subject identifier as normalized by the adapter; 32 bytes matching the on-chain id width."
+    },
+    "list_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[ -~]*$",
+      "description": "Identifier of the source list, e.g. \"OFAC-SDN\"."
+    },
+    "status": {
+      "enum": ["active", "inactive"],
+      "description": "Whether the record is currently in force."
+    },
+    "dataset_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonic version of the dataset this record belongs to; lets the registry detect stale data."
+    },
+    "effective_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$",
+      "description": "RFC 3339 time the listing became effective."
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Source identifier (adapter/authority), e.g. \"ofac\". Free-form so new providers do not require a schema change."
+    }
+  }
+}
