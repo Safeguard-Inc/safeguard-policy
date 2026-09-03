@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://safeguard.dev/schemas/policy.schema.json?version=1",
+  "title": "Safeguard Policy",
+  "description": "A policy document: identity, version and the rule set the policy enforces. Cross-item invariants (unique rule ids, at most one rule per type) are enforced by scripts/validate-policy.py because JSON Schema cannot express uniqueness across array items.",
+  "type": "object",
+  "required": ["policy_id", "version", "rules"],
+  "additionalProperties": false,
+  "properties": {
+    "policy_id": {
+      "$ref": "#/$defs/id",
+      "description": "Policy identifier; ASCII, 1-32 bytes to match the on-chain RuleId contract."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Policy version number (append-only; see docs/policy-model.md)."
+    },
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/rule" },
+      "description": "Enabled rules, evaluated in fixed precedence order (allowlist, denylist, sanctions, jurisdiction)."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Free-form deployment metadata (authority, contact, reference)."
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[ -~]*$",
+      "description": "ASCII identifier of at most 32 bytes (RuleId width in safeguard-core)."
+    },
+    "region_code": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "ISO 3166-1 alpha-2 region code, uppercase."
+    },
+    "region_lists": {
+      "type": "object",
+      "required": ["permitted", "restricted", "prohibited"],
+      "additionalProperties": false,
+      "properties": {
+        "permitted": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/region_code" },
+          "description": "Regions that may hold and transact the token."
+        },
+        "restricted": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/region_code" },
+          "description": "Regions that need review; trigger the rule action."
+        },
+        "prohibited": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/region_code" },
+          "description": "Regions that may not transact; trigger the rule action."
+        }
+      }
+    },
+    "jurisdiction_requires_regions": {
+      "if": {
+        "properties": { "type": { "const": "jurisdiction" } },
+        "required": ["type"]
+      },
+      "then": { "required": ["regions"] }
+    },
+    "non_jurisdiction_forbids_regions": {
+      "if": {
+        "properties": { "type": { "not": { "const": "jurisdiction" } } },
+        "required": ["type"]
+      },
+      "then": { "properties": { "regions": false } }
+    },
+    "rule": {
+      "description": "A single rule: stable shape mirrored by rule.schema.json (asserted by scripts/test-schema.py).",
+      "type": "object",
+      "required": ["id", "type", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "Rule id, unique within the policy version (e.g. \"SANCTIONS-001\")."
+        },
+        "type": {
+          "enum": ["allowlist", "denylist", "sanctions", "jurisdiction"],
+          "description": "Rule category; maps to safeguard_core::rule::RuleType labels."
+        },
+        "action": {
+          "enum": ["block", "flag"],
+          "description": "What the rule does when its condition is met; maps to safeguard_core::rule::RuleAction."
+        },
+        "regions": {
+          "$ref": "#/$defs/region_lists",
+          "description": "Required for jurisdiction rules; forbidden for other types. Classifies regions into permitted/restricted/prohibited; the rule action applies to restricted, prohibited and unknown regions (fail-closed)."
+        }
+      },
+      "allOf": [
+        { "$ref": "#/$defs/jurisdiction_requires_regions" },
+        { "$ref": "#/$defs/non_jurisdiction_forbids_regions" }
+      ]
+    }
+  }
+}
