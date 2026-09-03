@@ -21,6 +21,9 @@ safeguard version
 safeguard validate <policy.json>
 safeguard inspect  <policy.json>
 safeguard evaluate <policy.json> <facts.json>
+safeguard fixture validate [fixtures_dir]
+safeguard registry inspect <dataset.json>
+safeguard policy test <policy.json> [--fixtures-dir DIR] [--strict]
 ```
 
 ### `version`
@@ -75,6 +78,55 @@ the policy's region lists) or an explicit classification
 for `APPROVE`/`FLAG` and non-zero for `BLOCK`, so the CLI composes with
 shell pipelines and CI. See [`docs/how-to-evaluate.md`](how-to-evaluate.md)
 for the worked cases.
+
+### `fixture validate`
+
+Validates the fixture datasets (default `policies/fixtures`) with the same
+rules as `scripts/check-fixtures.py`, without needing the Python
+toolchain:
+
+- `accounts.json` — well-formed Stellar `G` addresses, known account-status
+  labels, jurisdictions in the universe or the `XX` unknown sentinel;
+- `jurisdictions.json` — well-formed region lists (uppercase ISO alpha-2,
+  no duplicates, no cross-list classification);
+- `sanctions.json` — entries parse through the SDK's schema-mirroring model,
+  subject hashes are 64 hex chars, dataset versions are >= 1.
+
+Prints an `OK:` summary (counts) or a numbered problem list, exiting 1 on
+failure.
+
+### `registry inspect`
+
+Summarizes a normalized registry dataset before it is pushed on-chain. The
+kind is auto-detected from the JSON shape:
+
+- **sanctions** entries (a `SanctionsDatasetEntry` array) — entry count,
+  active/inactive split, per-list breakdown, dataset versions;
+- **identity** records (an `{ "accounts": [...] }` object) — count and
+  status histogram;
+- the **region universe** (permitted/restricted/prohibited lists) — counts
+  per list.
+
+Unrecognized shapes are rejected with a clear message.
+
+### `policy test`
+
+Evaluates every account fixture through a policy offline — the policy
+author's acceptance run before anything touches the chain:
+
+```bash
+safeguard policy test policies/examples/combined-policy.json
+# policy example-combined v1 — 6 fixture subjects
+# account          status     region decision reason
+# GAAAAA…AAAWHF    active     US     APPROVE  no_reason
+# ...
+# summary: 2 approve, 2 block, 2 flag
+```
+
+`--strict` turns any `BLOCK` into a non-zero exit, so the command composes
+with CI gates. Account fixtures carry no screening claim, so
+`sanctions_matched` is `false` for every subject; inspect the sanctions
+dataset separately with `registry inspect`.
 
 ## Relationship to other tools
 
