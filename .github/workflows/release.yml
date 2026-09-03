@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  gate:
+    name: Full gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: sdk/typescript/package-lock.json
+
+      - name: Install validation dependencies
+        run: python3 -m pip install jsonschema
+
+      - name: Add Soroban wasm target
+        run: rustup target add wasm32v1-none
+
+      - name: Install cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+
+      - name: Run the full gate
+        run: |
+          npm ci --no-audit --no-fund --prefix sdk/typescript
+          ./scripts/ci.sh all
+
+  build:
+    name: Build artifacts
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: sdk/typescript/package-lock.json
+
+      - name: Add Soroban wasm target
+        run: rustup target add wasm32v1-none
+
+      - name: Build the contract wasm artifact
+        run: cargo build -p safeguard-contract --target wasm32v1-none --release
+
+      - name: Build the CLI binary
+        run: cargo build -p safeguard-cli --release
+
+      - name: Build the TypeScript SDK package
+        run: |
+          npm ci --no-audit --no-fund --prefix sdk/typescript
+          npm run build --prefix sdk/typescript
+
+      - name: Stage artifacts
+        run: |
+          mkdir -p dist
+          cp target/wasm32v1-none/release/safeguard_contract.wasm dist/
+          cp target/release/safeguard-cli dist/
+          cp -r policy-schema dist/policy-schema
+          cp -r policies dist/policies
+          tar czf dist/safeguard-policy-schemas.tar.gz policy-schema policies
+          tar czf dist/safeguard-sdk-typescript.tar.gz -C sdk/typescript dist package.json README.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: safeguard-dist
+          path: dist/
+
+  publish:
+    name: Publish GitHub release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: safeguard-dist
+          path: dist/
+
+      - name: Draft the release notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          {
+            echo "## Safeguard Policy v${VERSION}"
+            echo
+            echo "See [CHANGELOG.md](CHANGELOG.md) for the full list of changes."
+            echo
+            echo "### Artifacts"
+            echo
+            echo "- \`safeguard_contract.wasm\` — the Soroban policy contract (wasm32v1-none)"
+            echo "- \`safeguard-cli\` — the operator CLI binary"
+            echo "- \`safeguard-policy-schemas.tar.gz\` — JSON Schemas + reference policies"
+            echo "- \`safeguard-sdk-typescript.tar.gz\` — the TypeScript SDK package"
+          } > notes.md
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/safeguard_contract.wasm \
+            dist/safeguard-cli \
+            dist/safeguard-policy-schemas.tar.gz \
+            dist/safeguard-sdk-typescript.tar.gz \
+            --title "safeguard-policy ${GITHUB_REF_NAME}" \
+            --notes-file notes.md
