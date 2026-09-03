@@ -7,9 +7,13 @@ Enforces the rules documented in policies/fixtures/README.md:
    AccountStatus labels, and carry a jurisdiction that exists in
    jurisdictions.json (or the reserved ``XX`` unknown sentinel).
 2. Sanctions fixtures validate against the normalized sanctions schema.
-3. Every policy in policies/default and policies/examples validates
+3. Identity fixtures use known IdentityStatus labels and carry a
+   well-formed attestation reference.
+4. Token fixtures map every policy id to a well-formed Stellar-style
+   address, and every referenced policy id exists in the shipped policies.
+5. Every policy in policies/default and policies/examples validates
    (policy.schema.json + invariants via validate_policy.py).
-4. Every region code in a policy's jurisdiction rule exists in
+6. Every region code in a policy's jurisdiction rule exists in
    jurisdictions.json, so example policies and the region universe cannot
    drift apart.
 
@@ -39,6 +43,8 @@ FIXTURES_DIR = POLICIES_DIR / "fixtures"
 ACCOUNT_RE = re.compile(r"^G[A-Z2-7]{55}$")
 # Core AccountStatus labels (safeguard_core::rules::account_status).
 ACCOUNT_STATUSES = {"active", "restricted", "frozen", "suspended", "unknown"}
+# Core IdentityStatus labels (safeguard_core::registries::identity).
+IDENTITY_STATUSES = {"verified", "unverified", "revoked", "expired", "unknown"}
 # Reserved sentinel for an unknown jurisdiction (RegionStatus::Unknown).
 UNKNOWN_JURISDICTION = "XX"
 REGION_LISTS = ("permitted", "restricted", "prohibited")
@@ -81,6 +87,35 @@ def main() -> int:
         for error in validator.iter_errors(entry):
             problems.append(
                 f"sanctions: {'/'.join(str(p) for p in error.path) or '<entry>'}: {error.message}"
+            )
+
+    # ---- identity fixtures ------------------------------------------------
+    identity = load_json(FIXTURES_DIR / "identity.json")
+    for record in identity["accounts"]:
+        address = record["account"]
+        if not ACCOUNT_RE.match(address):
+            problems.append(f"identity: {address!r} is not a well-formed G address")
+        if record["status"] not in IDENTITY_STATUSES:
+            problems.append(f"identity: {address!r} has unknown status {record['status']!r}")
+        if not record.get("attestation_ref"):
+            problems.append(f"identity: {address!r} must carry an attestation_ref")
+        if not isinstance(record.get("expires_at"), int):
+            problems.append(f"identity: {address!r} expires_at must be an integer epoch")
+
+    # ---- token fixtures ---------------------------------------------------
+    tokens = load_json(FIXTURES_DIR / "tokens.json")["bindings"]
+    policy_ids: set[str] = set()
+    for directory in ("default", "examples"):
+        for path in sorted((POLICIES_DIR / directory).glob("*.json")):
+            policy_ids.add(load_json(path)["policy_id"])
+    for binding in tokens:
+        if binding["policy_id"] not in policy_ids:
+            problems.append(
+                f"tokens: policy {binding['policy_id']!r} has no shipped policy document"
+            )
+        if not ACCOUNT_RE.match(binding["token"]):
+            problems.append(
+                f"tokens: {binding['token']!r} is not a well-formed Stellar address"
             )
 
     # ---- reference policies ----------------------------------------------
