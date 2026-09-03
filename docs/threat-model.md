@@ -19,7 +19,7 @@ Assumed adversaries:
 
 | # | Threat | Impact | Mitigation | Status |
 | - | ------ | ------ | ---------- | ------ |
-| T1 | **Policy manipulation** — an unauthorized party registers or activates a policy version. | Rule set swapped; restricted actors approved. | Admin-only lifecycle entrypoints with `require_auth`; registration validated before persistence; append-only (no overwrite). | Mitigated |
+| T1 | **Policy manipulation** — an unauthorized party registers or activates a policy version. | Rule set swapped; restricted actors approved. | Role-split lifecycle: registration is admin-only, activation requires admin or policy authority, both `require_auth`; registration validated before persistence; append-only (no overwrite). | Mitigated |
 | T2 | **Policy downgrade** — replace active v3 with v1. | Re-enabled legacy rules or disabled checks. | Versions are immutable records; only drafts activate; re-registering an existing version is rejected (`VersionExists`); downgrade requires an explicit new version + activation. | Mitigated |
 | T3 | **Registry poisoning** — malicious compliance data (sanctions/identity) enters evaluation. | Bad subjects approved or legitimate subjects blocked. | Data enters only through reviewed adapters normalized against schemas (`sanctions.schema.json`); on-chain records validated at registration; dataset versions let stale data be detected. Partially mitigated by operator review; full registry on-chain wiring is Phase 4. | Partially mitigated |
 | T4 | **Privilege escalation** — a non-admin gains admin or authority powers. | Full control. | Role changes admin-only; `require_auth` on the acting address; declared-operator check precedes auth so non-members cannot even attempt; no anonymous mutations. | Mitigated |

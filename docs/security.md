@@ -27,13 +27,16 @@ an accident of implementation. Threat-by-threat analysis lives in
 
 | Role | Can do | Auth |
 | ---- | ------ | ---- |
-| Admin | Initialize; rotate admin; manage authorities; register/activate/deactivate policy versions; bind tokens | `require_auth` on the admin address |
-| Registry authority | Bind/unbind tokens to policies | Declared address verified as admin or authority, then `require_auth` |
+| Admin | Initialize; rotate admin; manage both authority sets; register policy versions; bind tokens | `require_auth` on the admin address |
+| Policy authority | Activate and deactivate policy versions | Declared address verified as admin or policy authority, then `require_auth` |
+| Registry authority | Bind/unbind tokens to policies; update compliance registries | Declared address verified as admin or authority, then `require_auth` |
 | Everyone else | Read queries; subject to evaluation | none (public reads) |
 
 Role changes are admin-only. There is deliberately no single unrestricted
-superuser beyond the admin, and the registry-authority role exists so token
-scope updates do not require the full policy-admin trust domain.
+superuser beyond the admin. The Policy Admin / Policy Authority split means
+no single role can both write a rule set **and** promote it to active; the
+registry-authority role exists so compliance-data updates do not require the
+full policy-admin trust domain.
 
 ## Fail-open vs fail-closed
 
@@ -56,13 +59,16 @@ All state-changing entrypoints authenticate before touching storage:
 
 - `initialize` — caller must be the declared admin; guarded against
   re-initialization.
-- Lifecycle (`register_version`, `activate_version`, `deactivate_version`) —
-  admin only.
+- `register_version` — admin only (Policy Admin writes rule sets).
+- `activate_version` / `deactivate_version` — admin or policy authority
+  (the spec's Policy Authority role; a registry authority cannot transition
+  the active version).
 - Registry (`bind_token`, `unbind_token`) — admin or registry authority.
   The declared operator is checked against the role set **before**
   `require_auth`, so a non-member cannot even attempt authorization.
 - Reads (`get_version`, `get_active_version`, `bound_tokens`, `admin`,
-  `authorities`, `evaluate`) — public; auditors can always read state.
+  `authorities`, `policy_authorities`, `evaluate`) — public; auditors can
+  always read state.
 
 ## Storage
 
