@@ -85,6 +85,28 @@ controlled, reviewable transitions:
 - policy changes: always a new version, activated explicitly;
 - schema changes: additive only (see `../policy-schema/README.md`).
 
+## Supply chain
+
+Dependency integrity is enforced by [`deny.toml`](../deny.toml) through
+`cargo-deny` (Rust) and `npm audit` (TypeScript SDK), run nightly and on
+dependency-touching PRs (`.github/workflows/security.yml`):
+
+- **Advisories**: known vulnerabilities and unsoundness reports are hard
+  failures across the whole graph — the wasm artifact is only as safe as
+  its deepest dependency. Unmaintained is scoped to workspace crates we
+  author, since much of the Soroban toolchain is frozen upstream.
+- **Licenses**: allowlist-only. A license expression outside the permissive
+  allow list fails by construction, keeping the project embeddable in
+  closed-source deployments of the confidential-token stack.
+- **Bans**: wildcard dependencies are rejected; internal crates pin both
+  path and version. Duplicate versions are warnings, not failures, given
+  the Soroban dependency tree.
+- **Sources**: only crates.io (and the Soroban git sources the toolchain
+  requires) are allowed.
+
+The same checks run locally via `./scripts/ci.sh security`, and the release
+workflow re-runs the gate on the exact tagged tree.
+
 ## See also
 
 - [`threat-model.md`](threat-model.md) — concrete threats and mitigations
