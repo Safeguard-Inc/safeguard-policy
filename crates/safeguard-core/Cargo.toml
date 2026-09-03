@@ -1,0 +1,15 @@
+[package]
+name = "safeguard-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Deterministic compliance policy engine for Stellar Confidential Tokens"
+keywords = ["stellar", "soroban", "compliance", "policy", "confidential-tokens"]
+categories = ["cryptography::cryptocurrencies"]
+
+[lints]
+workspace = true
+
+[dependencies]
