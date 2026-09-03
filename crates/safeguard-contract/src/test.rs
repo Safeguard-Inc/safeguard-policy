@@ -94,7 +94,7 @@ fn bound_and_active(
     token: &Address,
 ) {
     register_default_policy(env, client, policy, 1);
-    client.activate_version(policy, &1);
+    client.activate_version(admin, policy, &1);
     client.bind_token(admin, policy, token);
 }
 
@@ -153,7 +153,7 @@ fn register_activate_and_query_the_lifecycle() {
     assert_eq!(record.status, VersionStatus::Draft.to_code());
     assert_eq!(record.rules.len(), 2); // The activation invocation published one typed lifecycle event; events
                                        // are scoped to the invocation that emitted them, so query immediately.
-    client.activate_version(&policy, &1);
+    client.activate_version(&admin, &policy, &1);
     let all_events = env.events().all();
     assert_eq!(
         all_events.events().len(),
@@ -215,25 +215,29 @@ fn invalid_rule_sets_are_rejected_before_persisting() {
 #[test]
 fn activation_requires_a_draft_version() {
     let env = Env::default();
-    let (_, _, _, _, policy, client) = setup(&env);
+    let (admin, _, _, _, policy, client) = setup(&env);
     register_default_policy(&env, &client, &policy, 1);
-    client.activate_version(&policy, &1);
+    client.activate_version(&admin, &policy, &1);
 
     // Re-activating the active version is not allowed.
-    let err = client.try_activate_version(&policy, &1).unwrap_err();
+    let err = client
+        .try_activate_version(&admin, &policy, &1)
+        .unwrap_err();
     assert_eq!(err, contract_err(ContractError::VersionNotDraft));
 
     // Activating a version that does not exist fails cleanly.
-    let err = client.try_activate_version(&policy, &99).unwrap_err();
+    let err = client
+        .try_activate_version(&admin, &policy, &99)
+        .unwrap_err();
     assert_eq!(err, contract_err(ContractError::VersionNotFound));
 }
 
 #[test]
 fn activating_a_new_version_supersedes_the_old_one() {
     let env = Env::default();
-    let (_, _, _, _, policy, client) = setup(&env);
+    let (admin, _, _, _, policy, client) = setup(&env);
     register_default_policy(&env, &client, &policy, 1);
-    client.activate_version(&policy, &1);
+    client.activate_version(&admin, &policy, &1);
 
     let rules = vec![
         &env,
@@ -244,7 +248,7 @@ fn activating_a_new_version_supersedes_the_old_one() {
         },
     ];
     client.register_version(&policy, &2, &config_hash(&env, 2), &rules);
-    client.activate_version(&policy, &2);
+    client.activate_version(&admin, &policy, &2);
 
     assert_eq!(
         client.get_version(&policy, &1).status,
@@ -256,22 +260,134 @@ fn activating_a_new_version_supersedes_the_old_one() {
 #[test]
 fn deactivation_removes_the_active_version() {
     let env = Env::default();
-    let (_, _, _, _, policy, client) = setup(&env);
+    let (admin, _, _, _, policy, client) = setup(&env);
     register_default_policy(&env, &client, &policy, 1);
-    client.activate_version(&policy, &1);
-    client.deactivate_version(&policy, &1);
+    client.activate_version(&admin, &policy, &1);
+    client.deactivate_version(&admin, &policy, &1);
 
     assert_eq!(
         client.get_version(&policy, &1).status,
         VersionStatus::Disabled.to_code()
     );
     // Only the active version may be deactivated.
-    let err = client.try_deactivate_version(&policy, &1).unwrap_err();
+    let err = client
+        .try_deactivate_version(&admin, &policy, &1)
+        .unwrap_err();
     assert_eq!(err, contract_err(ContractError::VersionNotActive));
     // The policy has no active version anymore.
     assert_eq!(
         client.try_get_active_version(&policy).unwrap_err(),
         contract_err(ContractError::PolicyNotActive)
+    );
+}
+
+// ----------------------------------------------- policy-authority role split
+
+/// The spec separates creating versions (admin) from activating them (policy
+/// authority): a registry authority — who may update compliance registries —
+/// must NOT be able to activate or deactivate a policy version.
+#[test]
+fn only_admin_or_policy_authority_can_activate_or_deactivate() {
+    let env = Env::default();
+    let (admin, authority, stranger, _, policy, client) = setup(&env);
+
+    // A registry authority is not a policy authority.
+    let policy_authority = Address::generate(&env);
+    client.add_policy_authority(&policy_authority);
+    assert_eq!(
+        client.policy_authorities(),
+        vec![&env, policy_authority.clone()]
+    );
+
+    register_default_policy(&env, &client, &policy, 1);
+
+    // A registry authority cannot activate.
+    let err = client
+        .try_activate_version(&authority, &policy, &1)
+        .unwrap_err();
+    assert_eq!(err, contract_err(ContractError::Unauthorized));
+
+    // A stranger cannot activate either.
+    let err = client
+        .try_activate_version(&stranger, &policy, &1)
+        .unwrap_err();
+    assert_eq!(err, contract_err(ContractError::Unauthorized));
+
+    // The policy authority can.
+    client.activate_version(&policy_authority, &policy, &1);
+    assert_eq!(client.get_active_version(&policy).version, 1);
+
+    // A registry authority cannot deactivate either.
+    let err = client
+        .try_deactivate_version(&authority, &policy, &1)
+        .unwrap_err();
+    assert_eq!(err, contract_err(ContractError::Unauthorized));
+
+    // The policy authority can.
+    client.deactivate_version(&policy_authority, &policy, &1);
+    assert_eq!(
+        client.get_version(&policy, &1).status,
+        VersionStatus::Disabled.to_code()
+    );
+
+    // The admin remains able to do both (bootstrap/emergency path):
+    // register a fresh draft and activate it.
+    let rules = vec![
+        &env,
+        RuleRecord {
+            rule_id: rid(&env, "ALLOWLIST-001"),
+            rule_type: RuleType::Allowlist.to_code(),
+            action: RuleAction::Block.to_code(),
+        },
+    ];
+    client.register_version(&policy, &2, &config_hash(&env, 2), &rules);
+    client.activate_version(&admin, &policy, &2);
+    assert_eq!(client.get_active_version(&policy).version, 2);
+}
+
+/// Policy-authority role changes publish events only on real changes, like
+/// the registry-authority set.
+#[test]
+fn policy_authority_changes_publish_events_only_on_real_changes() {
+    use soroban_sdk::xdr::ContractEventBody;
+    use soroban_sdk::Symbol;
+    use soroban_sdk::TryFromVal as _;
+
+    fn event_identity(env: &Env, event: &soroban_sdk::xdr::ContractEvent) -> (Symbol, Address) {
+        let ContractEventBody::V0(v0) = &event.body;
+        let name: Symbol = Symbol::try_from_val(env, &v0.topics[0]).expect("symbol topic");
+        let emitted: Address = Address::try_from_val(env, &v0.topics[1]).expect("address topic");
+        (name, emitted)
+    }
+
+    let env = Env::default();
+    let (_, _, _, _, _, client) = setup(&env);
+
+    let newcomer = Address::generate(&env);
+    client.add_policy_authority(&newcomer);
+    let all_events = env.events().all();
+    assert_eq!(all_events.events().len(), 1);
+    assert_eq!(
+        event_identity(&env, &all_events.events()[0]),
+        (
+            Symbol::new(&env, "policy_authority_added"),
+            newcomer.clone()
+        )
+    );
+
+    // Re-adding is a no-op: no event.
+    client.add_policy_authority(&newcomer);
+    assert_eq!(env.events().all().events().len(), 0);
+
+    client.remove_policy_authority(&newcomer);
+    let all_events = env.events().all();
+    assert_eq!(all_events.events().len(), 1);
+    assert_eq!(
+        event_identity(&env, &all_events.events()[0]),
+        (
+            Symbol::new(&env, "policy_authority_removed"),
+            newcomer.clone()
+        )
     );
 }
 
@@ -330,7 +446,7 @@ fn flag_actions_flag_instead_of_blocking() {
         },
     ];
     client.register_version(&policy, &1, &config_hash(&env, 1), &rules);
-    client.activate_version(&policy, &1);
+    client.activate_version(&admin, &policy, &1);
     client.bind_token(&admin, &policy, &token);
 
     let mut facts = active_input(&env, &admin);
@@ -400,7 +516,7 @@ fn scope_guards_refuse_evaluation_outside_the_policy() {
 
     // Active version but the token is not bound.
     register_default_policy(&env, &client, &policy, 1);
-    client.activate_version(&policy, &1);
+    client.activate_version(&admin, &policy, &1);
     let other_token = Address::generate(&env);
     assert_eq!(
         client
@@ -434,7 +550,7 @@ fn jurisdiction_active(
         },
     ];
     client.register_version(policy, &1, &config_hash(env, 3), &rules);
-    client.activate_version(policy, &1);
+    client.activate_version(admin, policy, &1);
     client.bind_token(admin, policy, token);
 }
 
@@ -671,7 +787,7 @@ fn arbitrary_input_codes_never_error_or_fail_open() {
         },
     ];
     client.register_version(&policy2, &1, &config_hash(&env, 4), &rules);
-    client.activate_version(&policy2, &1);
+    client.activate_version(&admin, &policy2, &1);
     client.bind_token(&admin, &policy2, &token2);
 
     let account = Address::generate(&env);
@@ -766,7 +882,7 @@ fn register_shipped(
         });
     }
     client.register_version(policy_id, &1, &config_hash(env, 9), &records);
-    client.activate_version(policy_id, &1);
+    client.activate_version(admin, policy_id, &1);
     client.bind_token(admin, policy_id, token);
 }
 
