@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Local full-gate runner: everything CI enforces, in one command.
 #
-#   ./scripts/ci.sh          # everything (rust + schema + typescript)
+#   ./scripts/ci.sh          # everything (rust + schema + typescript + security + scripts)
 #   ./scripts/ci.sh rust      # fmt, clippy, tests, wasm artifact build
 #   ./scripts/ci.sh schema    # schema battery, fixtures, reference policies
 #   ./scripts/ci.sh typescript # TS SDK typecheck + tests
+#   ./scripts/ci.sh security  # cargo-deny + npm audit
+#   ./scripts/ci.sh scripts   # runbook syntax, dry-runs, adapter sample
 #
 # Exits non-zero on the first failing step.
 
@@ -43,6 +45,11 @@ schema_gate() {
         policies/examples/*.json
 }
 
+typescript_gate() {
+    echo "==> TypeScript SDK (typecheck, build, tests)"
+    (cd sdk/typescript && npm ci --no-audit --no-fund && npm test)
+}
+
 security_gate() {
     echo "==> cargo-deny (advisories, bans, licenses, sources)"
     if ! command -v cargo-deny >/dev/null 2>&1; then
@@ -55,14 +62,39 @@ security_gate() {
     (cd sdk/typescript && npm audit --audit-level=high)
 }
 
+scripts_gate() {
+    echo "==> shell script syntax (bash -n)"
+    for script in scripts/*.sh; do
+        bash -n "$script"
+    done
+
+    echo "==> operator runbooks (deploy + rehearse) dry-run"
+    ./scripts/deploy-testnet.sh --dry-run >/dev/null
+    ./scripts/rehearse-upgrade.sh --dry-run >/dev/null
+
+    echo "==> adapter sample snapshot builds and validates"
+    report=$(mktemp)
+    cargo run -q -p safeguard-cli -- dataset build \
+        policies/fixtures/snapshots/ofac-sample.txt -o "$report" >/dev/null
+    python3 - "$report" <<'EOF'
+import json, sys
+report = json.load(open(sys.argv[1]))
+assert len(report["entries"]) == 5, report
+assert len(report["review"]) == 1, report
+print("    sample snapshot: 5 entries, 1 review item")
+EOF
+    rm -f "$report"
+}
+
 case "${1:-all}" in
     rust)       rust_gate ;;
     schema)     schema_gate ;;
     typescript) typescript_gate ;;
     security)   security_gate ;;
-    all)        rust_gate; schema_gate; typescript_gate; security_gate ;;
+    scripts)    scripts_gate ;;
+    all)        rust_gate; schema_gate; typescript_gate; security_gate; scripts_gate ;;
     *)
-        echo "usage: $0 [rust|schema|typescript|security|all]" >&2
+        echo "usage: $0 [rust|schema|typescript|security|scripts|all]" >&2
         exit 2
         ;;
 esac
