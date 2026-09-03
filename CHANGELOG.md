@@ -65,3 +65,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reference docs updated for the registry layer and the compatibility
   gates (`registries.md`, `contract-interface.md`, `integration.md`,
   `how-to-evaluate.md`).
+- `registry_authority_changed` event family (`AuthorityAdded`/`AuthorityRemoved`):
+  role changes now emit typed events for audit, with contract tests and
+  interface documentation.
+- Operator CLI expansions: `fixture validate`, `registry inspect`
+  (auto-detecting sanctions/identity/token/jurisdiction datasets), and
+  `policy test` (fixture-driven acceptance runs with per-subject
+  decisions); the facts-file model moved into the SDK and is shared with
+  the CLI.
+- Fixture datasets for identity verification records and policy→token
+  registry bindings, validated by `scripts/check-fixtures.py` and the CLI
+  fixture gate (including a shipped-policy cross-check).
+- Dependency supply-chain gate: `deny.toml` (cargo-deny: advisories,
+  allowlist-only licenses, wildcard bans, sources) and npm audit, run by
+  `.github/workflows/security.yml` nightly and on dependency PRs, and
+  locally via `./scripts/ci.sh security`.
+- Tag-driven release pipeline (`.github/workflows/release.yml`) building
+  the contract wasm, CLI binary, schemas + policies tarball and the
+  TypeScript SDK package into a GitHub release, plus `docs/release.md`
+  describing the version model, checklist and rollback.
+- TypeScript SDK identity registry types (`IdentityRecord`,
+  `isIdentityRecord`) mirroring the on-chain verification surface.
+- Schema battery extended to 39 checks with standalone sanctions-entry
+  and decision-document positive/negative cases.
