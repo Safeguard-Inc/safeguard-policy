@@ -31,4 +31,5 @@
 //! - **Validate before publish.** Output is validated against the SDK's
 //!   schema-mirroring models before it can reach a registry.
 
+pub mod identity;
 pub mod sanctions;
