@@ -8,6 +8,8 @@
 //! enforcement: activating a policy or evaluating live subjects happens
 //! against the contract, never through this binary.
 
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 
 mod commands;
@@ -32,12 +34,18 @@ struct Cli {
 enum Command {
     /// Print version information.
     Version,
+    /// Validate a policy document (schema + invariants).
+    Validate {
+        /// Path to a policy JSON document.
+        path: PathBuf,
+    },
 }
 
 fn main() {
     let cli = Cli::parse();
     let result = match cli.command {
         Command::Version => commands::version::run(),
+        Command::Validate { path } => commands::validate::run(&path),
     };
     if let Err(error) = result {
         eprintln!("error: {error:#}");
