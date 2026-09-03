@@ -16,6 +16,7 @@ use soroban_sdk::{contract, contractimpl, Address, Env, Vec};
 
 use crate::admin;
 use crate::error::ContractError;
+use crate::evaluate::{self, EvaluationInput, EvaluationResult};
 use crate::lifecycle;
 use crate::registry;
 use crate::storage::{Id, PolicyVersionRecord, RuleRecord};
@@ -132,5 +133,21 @@ impl PolicyContract {
     /// The tokens bound to a policy (public read).
     pub fn bound_tokens(env: Env, policy_id: Id) -> Vec<Address> {
         registry::bound_tokens(&env, &policy_id)
+    }
+
+    // ------------------------------------------------------------ evaluation
+
+    /// Evaluate a subject against the active version of a policy for a token.
+    ///
+    /// Public read; deterministic; never writes state. The caller supplies
+    /// compliance facts (`EvaluationInput`); the contract supplies rule
+    /// configuration from the active policy version and returns the decision.
+    pub fn evaluate(
+        env: Env,
+        policy_id: Id,
+        token: Address,
+        input: EvaluationInput,
+    ) -> Result<EvaluationResult, ContractError> {
+        evaluate::evaluate(&env, &policy_id, &token, &input)
     }
 }
