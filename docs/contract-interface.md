@@ -15,14 +15,16 @@ The on-chain surface of `safeguard-contract`. This is the reference for
 | `set_admin(new_admin)` | current admin + new admin | Rotate the admin (both sides authenticate). |
 | `authorities() -> Vec<Address>` | public | Read registry authorities. |
 | `add_authority(authority)` / `remove_authority(authority)` | admin | Manage registry authorities. |
+| `policy_authorities() -> Vec<Address>` | public | Read policy authorities. |
+| `add_policy_authority(authority)` / `remove_policy_authority(authority)` | admin | Manage policy authorities (may activate/deactivate versions). |
 
 ### Policy lifecycle
 
 | Function | Auth | Description |
 | -------- | ---- | ----------- |
 | `register_version(policy_id, version, config_hash, rules)` | admin | Create a `Draft` version. Rejects existing versions (`VersionExists`) and invalid rule sets (`InvalidRuleSet`). |
-| `activate_version(policy_id, version)` | admin | Promote a draft to `Active`; the previous active version becomes `Superseded`. Fails on non-drafts (`VersionNotDraft`) and missing versions (`VersionNotFound`). |
-| `deactivate_version(policy_id, version)` | admin | Disable the active version; clears the active pointer. Only the active version may be deactivated (`VersionNotActive`). |
+| `activate_version(operator, policy_id, version)` | admin or policy authority | Promote a draft to `Active`; the previous active version becomes `Superseded`. Fails on non-drafts (`VersionNotDraft`) and missing versions (`VersionNotFound`). |
+| `deactivate_version(operator, policy_id, version)` | admin or policy authority | Disable the active version; clears the active pointer. Only the active version may be deactivated (`VersionNotActive`). |
 | `get_version(policy_id, version) -> PolicyVersionRecord` | public | Read a specific version record. |
 | `get_active_version(policy_id) -> PolicyVersionRecord` | public | Read the active version. Fails `PolicyNotActive` when none. |
 
@@ -128,12 +130,16 @@ Typed `contractevent`s published by the lifecycle and registries:
 | `jurisdiction_cleared` | account |
 | `authority_added` | authority |
 | `authority_removed` | authority |
+| `policy_authority_added` | authority |
+| `policy_authority_removed` | authority |
 
 These are the **configuration-change** events audit consumes: the
 `registry_updated` family covers compliance-data mutations, and the
 `authority_added`/`authority_removed` pair is the `registry_authority_changed`
-family proving who held the registry-authority role when. Both fire only on
-real changes (idempotent role calls and no-op registry writes stay silent).
+family proving who held the registry-authority role when. The
+`policy_authority_added`/`policy_authority_removed` pair does the same for
+who could promote policy versions to active. All fire only on real changes
+(idempotent role calls and no-op registry writes stay silent).
 Transfer-level events (`transfer_approved`, `transfer_blocked`) belong to
 `safeguard-hooks`.
 

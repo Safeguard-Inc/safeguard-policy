@@ -89,7 +89,7 @@ See [`versioning.md`](versioning.md) for the compatibility contract.
 
 ```text
 1.  Admin:  register_version(policy, 1, hash, [ALLOWLIST-001, SANCTIONS-001])
-2.  Admin:  activate_version(policy, 1)
+2.  PolicyA: activate_version(operator, policy, 1)   ← policy authority, not the admin
 3.  Authy:  bind_token(authority, policy, token)
 4.  Authy:  set_sanctions_entry(authority, subject_hash, "OFAC-SDN", active, ...)
 5.  Hook:   evaluate(policy, token, { status: active, member: true, ... })
