@@ -169,6 +169,35 @@ fn register_activate_and_query_the_lifecycle() {
     assert_eq!(client.bound_tokens(&policy), vec![&env, token.clone()]);
 }
 
+/// Registering a version publishes one rule_registered event per rule, so
+/// audit can prove the exact rule set of every version.
+#[test]
+fn registering_publishes_one_rule_event_per_rule() {
+    use soroban_sdk::xdr::ContractEventBody;
+    use soroban_sdk::Symbol;
+    use soroban_sdk::TryFromVal as _;
+
+    fn rule_event_count(env: &Env, events: &soroban_sdk::testutils::ContractEvents) -> usize {
+        events
+            .events()
+            .iter()
+            .filter(|event| {
+                let ContractEventBody::V0(v0) = &event.body;
+                let name: Symbol = Symbol::try_from_val(env, &v0.topics[0]).expect("symbol topic");
+                name == Symbol::new(env, "rule_registered")
+            })
+            .count()
+    }
+
+    let env = Env::default();
+    let (_, _, _, _, policy, client) = setup(&env);
+
+    register_default_policy(&env, &client, &policy, 1);
+    let rule_events = rule_event_count(&env, &env.events().all());
+    // register_default_policy registers two rules (allowlist + sanctions).
+    assert_eq!(rule_events, 2, "one rule_registered event per rule");
+}
+
 #[test]
 fn duplicate_registration_is_rejected() {
     let env = Env::default();

@@ -80,6 +80,18 @@ pub fn register_version(
         config_hash: config_hash.clone(),
     }
     .publish(env);
+    // One event per rule, so audit can prove the exact rule set — each rule
+    // within the version — that was registered.
+    for record in rules.iter() {
+        crate::events::rule_registered(
+            env,
+            policy_id,
+            version,
+            &record.rule_id,
+            record.rule_type,
+            record.action,
+        );
+    }
     Ok(())
 }
 
