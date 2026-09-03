@@ -51,10 +51,26 @@ evaluation. It does **not** enforce token transfers (that is
 `safeguard-hooks`), and it is not a wallet, dashboard, auditor UI, KYC
 provider, or centralized sanctions database.
 
+## Issue taxonomy
+
+Issues and PRs are tagged with one of the following categories so the issue
+pool stays filterable (use the "Contributor task" template for scoped tasks):
+
+| Label | Covers |
+| ----- | ------ |
+| `SC` | Smart contract work: policy registry, policy versioning, allowlist/denylist contracts, jurisdiction rules, sanctions registry, account-status rules, the evaluation engine, policy precedence |
+| `SDK` | Rust policy client, TypeScript policy client, registry helpers, error types, policy serialization |
+| `CLI` | Policy validation, policy inspection, fixture generation, policy testing |
+| `TEST` | Allowlist/sanctions/jurisdiction tests, fuzz tests, regression tests, compatibility tests |
+| `INFRA` | CI, release automation, package publishing, contract deployment automation |
+| `DOCS` | Policy specification, threat model, integration guide, contributor guide, examples |
+| `SECURITY` | Threat modeling, access-control review, policy-downgrade tests, malicious-registry tests |
+
 ## Making changes
 
 1. Open an issue describing the change (policy changes and contract changes
-   both deserve review).
+   both deserve review). Scoped tasks use the "Contributor task" template;
+   tag them with the category above.
 2. Keep commits small and self-contained: one improvement per commit, each
    leaving the workspace green.
 3. Every behavioral change ships with tests:
