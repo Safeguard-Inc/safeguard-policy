@@ -112,3 +112,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scripts` gate dry-runs the runbooks and rebuilds the sample dataset.
 - Docs: `adapters.md` and `cli.md` document the implemented pipeline;
   roadmap, versioning and design-decisions records updated (D13-D15).
+
+## [Unreleased] — 100%-spec batch
+
+### Added
+
+- `rule_registered` lifecycle event: one typed event per rule in every
+  `register_version` call, so audit can reconstruct the exact rule set of
+  any registered version from events alone (§26).
+- Policy Authority role: a dedicated role (managed by the admin) that may
+  activate and deactivate policy versions, separating *creating* versions
+  (admin) from *promoting* them; `policy_authority_added` /
+  `policy_authority_removed` events make role changes auditable (§24).
+- Contributor issue taxonomy (SC/SDK/CLI/TEST/INFRA/DOCS/SECURITY) in
+  `CONTRIBUTING.md`, a "Contributor task" issue template, and aligned
+  feature-template labels (§30).
+- Registry publishing: crates.io (core → sdk → adapters → cli, token-gated)
+  and npm (`@safeguard/policy-sdk`) jobs in the release workflow, a
+  publishable npm package, and a local publish-readiness gate in `ci.sh`
+  (§29).
+- Negative contract tests: unknown account reads `None` and fails closed to
+  FLAG; expired attestations are stored unmutated and require an authorised
+  registry authority to replace (§18).
+- Documentation closures: policy-schema README tables what the JSON document
+  carries versus on-chain lifecycle state (§10), and the contract interface
+  documents the no-external-data, no-wall-clock evaluation boundary (§3).
+
+### Changed
+
+- `activate_version` / `deactivate_version` now take an `operator` argument
+  and require the admin or a policy authority (was: admin only); deploy and
+  upgrade-rehearsal runbooks pass the admin.

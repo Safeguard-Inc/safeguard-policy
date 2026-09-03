@@ -177,7 +177,7 @@ rustup target add wasm32v1-none
 
 # The full local gate (same as CI): fmt, clippy, tests, wasm build,
 # schema battery, fixture checks, TypeScript SDK, dependency audit,
-# runbook dry-runs
+# runbook dry-runs, publish-readiness
 ./scripts/ci.sh
 
 # Or just one part
@@ -186,6 +186,7 @@ rustup target add wasm32v1-none
 ./scripts/ci.sh typescript
 ./scripts/ci.sh security
 ./scripts/ci.sh scripts
+./scripts/ci.sh publish
 ```
 
 ## Using policies
@@ -244,7 +245,8 @@ The build order follows the phases in [`docs/architecture.md`](docs/architecture
 6. **Hardening** — reference docs, CI, security model, proptest fuzzing, shipped-policy and golden compatibility gates, dependency supply-chain gate (cargo-deny + npm audit), and the release pipeline ✅
 7. **Adapters** — sanctions/identity/jurisdiction pipelines in `crates/safeguard-adapters`, the `dataset build` CLI, and the shipped sample snapshot ✅
 8. **Deployment** — `scripts/deploy-testnet.sh` and `scripts/rehearse-upgrade.sh` runbooks with an offline-validated gate (live runs need a network) ✅
-9. **Cross-repo** — `safeguard-hooks` CI, mainnet rollout (needs the hooks polyrepo)
+9. **Spec completeness** — `rule_registered` event, Policy Authority role split, contributor issue taxonomy, registry publishing (crates.io + npm), negative tests for unknown accounts and expired attestations ✅
+10. **Cross-repo** — `safeguard-hooks` CI, mainnet rollout (needs the hooks polyrepo)
 
 ## Contributing
 
