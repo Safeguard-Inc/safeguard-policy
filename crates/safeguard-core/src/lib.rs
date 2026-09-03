@@ -39,3 +39,4 @@ extern crate std;
 pub mod decision;
 pub mod rule;
 pub mod rules;
+pub mod version;
