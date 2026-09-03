@@ -152,6 +152,7 @@ fi
 
 say "Activating $POLICY_ID v$POLICY_VERSION"
 invoke "${BASE[@]}" -- activate_version \
+    --operator "$ADMIN" \
     --policy_id "$POLICY_ID_HEX" \
     --version "$POLICY_VERSION"
 
@@ -164,6 +165,7 @@ invoke "${BASE[@]}" -- activate_version \
 echo
 say "Deactivating (leaving the drill policy dormant)"
 invoke "${BASE[@]}" -- deactivate_version \
+    --operator "$ADMIN" \
     --policy_id "$POLICY_ID_HEX" \
     --version "$POLICY_VERSION"
 

@@ -175,6 +175,7 @@ EOF
             --source-account "$ADMIN" \
             --id "$ALIAS" \
             -- activate_version \
+            --operator "$ADMIN" \
             --policy_id "$POLICY_ID_HEX" \
             --version 1
 
