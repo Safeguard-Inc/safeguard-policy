@@ -151,6 +151,7 @@ identical decision. No network calls, no randomness, no hidden state.
 │           ├── admin.rs      # Role-based administration
 │           ├── lifecycle.rs  # register / activate / deactivate
 │           ├── registry.rs   # Policy ↔ token bindings
+│           ├── registries/   # identity, sanctions, jurisdiction registries
 │           ├── evaluate.rs   # On-chain evaluation entrypoint
 │           └── test.rs       # Contract integration tests
 ├── crates/safeguard-sdk/     # Off-chain Rust SDK (model, validation, evaluation)
@@ -227,9 +228,9 @@ The build order follows the phases in [`docs/architecture.md`](docs/architecture
 1. **Foundation** — policy types, schema, policy contract, versioning ✅
 2. **Core rules** — allowlist, denylist, sanctions, jurisdiction, account status ✅
 3. **Evaluation** — deterministic APPROVE/BLOCK/FLAG engine ✅
-4. **Registries** — identity, sanctions, jurisdiction, token scope (contract wiring)
+4. **Registries** — identity, sanctions, jurisdiction on-chain; `evaluate` resolves from them authoritatively ✅
 5. **Developer tooling** — Rust/TypeScript SDKs, CLI ✅
-6. **Hardening** — reference docs, CI, security model ✅; fuzzing, compatibility tests against `safeguard-hooks`, testnet deployment pending
+6. **Hardening** — reference docs, CI, security model, proptest fuzzing, shipped-policy and golden compatibility gates ✅; cross-repo `safeguard-hooks` CI + testnet deployment pending
 
 ## Contributing
 
