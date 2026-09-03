@@ -166,6 +166,12 @@ pub fn set_active_version(env: &Env, policy_id: &Id, version: u32) {
     set_persistent(env, &DataKey::ActiveVersion(policy_id.clone()), &version);
 }
 
+pub fn clear_active_version(env: &Env, policy_id: &Id) {
+    env.storage()
+        .persistent()
+        .remove(&DataKey::ActiveVersion(policy_id.clone()));
+}
+
 pub fn token_bindings(env: &Env, policy_id: &Id) -> Vec<Address> {
     get_persistent(env, &DataKey::TokenBindings(policy_id.clone())).unwrap_or_else(|| vec![env])
 }

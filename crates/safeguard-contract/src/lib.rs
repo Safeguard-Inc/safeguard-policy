@@ -38,6 +38,7 @@ extern crate std;
 mod admin;
 mod contract;
 mod error;
+mod events;
 mod lifecycle;
 mod registry;
 mod storage;

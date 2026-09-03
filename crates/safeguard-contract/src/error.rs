@@ -31,4 +31,8 @@ pub enum ContractError {
     TokenNotBound = 9,
     /// The policy id is reserved or otherwise invalid.
     InvalidPolicyId = 10,
+    /// A version with this policy id and number already exists (append-only).
+    VersionExists = 11,
+    /// The version exists but is not the active version.
+    VersionNotActive = 12,
 }

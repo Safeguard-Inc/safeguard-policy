@@ -16,6 +16,8 @@ use soroban_sdk::{contract, contractimpl, Address, Env, Vec};
 
 use crate::admin;
 use crate::error::ContractError;
+use crate::lifecycle;
+use crate::storage::{Id, PolicyVersionRecord, RuleRecord};
 
 #[contract]
 pub struct PolicyContract;
@@ -61,5 +63,46 @@ impl PolicyContract {
     /// Remove a registry authority. Requires the admin's auth.
     pub fn remove_authority(env: Env, authority: Address) -> Result<(), ContractError> {
         admin::remove_authority(&env, &authority)
+    }
+
+    // ------------------------------------------------------------- lifecycle
+
+    /// Register a new draft version of a policy. Admin only; append-only.
+    pub fn register_version(
+        env: Env,
+        policy_id: Id,
+        version: u32,
+        config_hash: Id,
+        rules: Vec<RuleRecord>,
+    ) -> Result<(), ContractError> {
+        lifecycle::register_version(&env, &policy_id, version, &config_hash, &rules)
+    }
+
+    /// Activate a draft version, superseding the previous active version.
+    /// Admin only.
+    pub fn activate_version(env: Env, policy_id: Id, version: u32) -> Result<(), ContractError> {
+        lifecycle::activate_version(&env, &policy_id, version)
+    }
+
+    /// Deactivate the active version of a policy. Admin only.
+    pub fn deactivate_version(env: Env, policy_id: Id, version: u32) -> Result<(), ContractError> {
+        lifecycle::deactivate_version(&env, &policy_id, version)
+    }
+
+    /// The record of a specific policy version (public read).
+    pub fn get_version(
+        env: Env,
+        policy_id: Id,
+        version: u32,
+    ) -> Result<PolicyVersionRecord, ContractError> {
+        lifecycle::get_version(&env, &policy_id, version)
+    }
+
+    /// The record of the active version of a policy (public read).
+    pub fn get_active_version(
+        env: Env,
+        policy_id: Id,
+    ) -> Result<PolicyVersionRecord, ContractError> {
+        lifecycle::get_active_version(&env, &policy_id)
     }
 }

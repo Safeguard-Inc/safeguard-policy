@@ -1,0 +1,41 @@
+//! Typed policy lifecycle events.
+//!
+//! These events make changes to the compliance configuration itself auditable
+//! — they are the difference between "the policy changed" and "we can prove
+//! which policy version was active when". `safeguard-audit` consumes them;
+//! the event names are part of the stable interface between the polyrepos.
+//!
+//! Note the boundary: **transfer-level** events (`transfer_approved`,
+//! `transfer_blocked`) belong to `safeguard-hooks`, not here.
+
+use soroban_sdk::contractevent;
+
+use crate::storage::Id;
+
+/// A new draft version of a policy was registered.
+#[contractevent]
+pub struct PolicyCreated {
+    #[topic]
+    pub policy_id: Id,
+    pub version: u32,
+    pub config_hash: Id,
+}
+
+/// A draft version was activated (any previously active version is
+/// superseded).
+#[contractevent]
+pub struct PolicyActivated {
+    #[topic]
+    pub policy_id: Id,
+    pub version: u32,
+    pub config_hash: Id,
+}
+
+/// The active version of a policy was deactivated (policy now has no active
+/// version until a new one is activated).
+#[contractevent]
+pub struct PolicyDeactivated {
+    #[topic]
+    pub policy_id: Id,
+    pub version: u32,
+}
