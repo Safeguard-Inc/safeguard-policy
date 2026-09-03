@@ -29,7 +29,10 @@ impl RuleId {
     /// Build an identifier from a string, truncating to [`ID_LEN`] bytes.
     ///
     /// Bytes beyond the first [`ID_LEN`] are dropped; shorter inputs are
-    /// zero-padded.
+    /// zero-padded. The name deliberately mirrors [`FromStr::from_str`] for
+    /// ergonomics; the behavior differs (truncation instead of failure) so
+    /// the trait itself is not implemented.
+    #[allow(clippy::should_implement_trait)]
     #[must_use]
     pub fn from_str(input: &str) -> Self {
         let mut bytes = [0u8; ID_LEN];

@@ -155,30 +155,37 @@ mod tests {
 
     #[test]
     fn each_rule_triggers_with_its_own_reason_and_id() {
-        let mut request = EvaluationRequest::default();
-
-        request.allowlist = allowlist(false, RuleAction::Block);
+        let request = EvaluationRequest {
+            allowlist: allowlist(false, RuleAction::Block),
+            ..EvaluationRequest::default()
+        };
         let decision = evaluate(&request);
         assert_eq!(decision.decision, Decision::Block);
         assert_eq!(decision.reason_code, ReasonCode::AllowlistRequired);
         assert_eq!(decision.rule, Some(RuleId::from_str("ALLOWLIST-001")));
 
-        request.allowlist = None;
-        request.denylist = denylist(true, RuleAction::Block);
+        let request = EvaluationRequest {
+            denylist: denylist(true, RuleAction::Block),
+            ..EvaluationRequest::default()
+        };
         let decision = evaluate(&request);
         assert_eq!(decision.decision, Decision::Block);
         assert_eq!(decision.reason_code, ReasonCode::DenylistMatch);
         assert_eq!(decision.rule, Some(RuleId::from_str("DENYLIST-001")));
 
-        request.denylist = None;
-        request.sanctions = sanctions(true, RuleAction::Block);
+        let request = EvaluationRequest {
+            sanctions: sanctions(true, RuleAction::Block),
+            ..EvaluationRequest::default()
+        };
         let decision = evaluate(&request);
         assert_eq!(decision.decision, Decision::Block);
         assert_eq!(decision.reason_code, ReasonCode::SanctionsMatch);
         assert_eq!(decision.rule, Some(RuleId::from_str("SANCTIONS-001")));
 
-        request.sanctions = None;
-        request.jurisdiction = jurisdiction(RegionStatus::Prohibited, RuleAction::Block);
+        let request = EvaluationRequest {
+            jurisdiction: jurisdiction(RegionStatus::Prohibited, RuleAction::Block),
+            ..EvaluationRequest::default()
+        };
         let decision = evaluate(&request);
         assert_eq!(decision.decision, Decision::Block);
         assert_eq!(decision.reason_code, ReasonCode::JurisdictionProhibited);
@@ -187,8 +194,10 @@ mod tests {
 
     #[test]
     fn rule_actions_resolve_to_flag() {
-        let mut request = EvaluationRequest::default();
-        request.sanctions = sanctions(true, RuleAction::Flag);
+        let request = EvaluationRequest {
+            sanctions: sanctions(true, RuleAction::Flag),
+            ..EvaluationRequest::default()
+        };
         let decision = evaluate(&request);
         assert_eq!(decision.decision, Decision::Flag);
         assert_eq!(decision.reason_code, ReasonCode::SanctionsMatch);
