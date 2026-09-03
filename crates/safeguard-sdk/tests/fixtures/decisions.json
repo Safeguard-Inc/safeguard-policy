@@ -1,0 +1,48 @@
+[
+  {
+    "decision": "APPROVE",
+    "policy_id": "example-combined",
+    "policy_version": 1,
+    "reason_code": "no_reason",
+    "timestamp": "2026-09-03T00:00:00.000Z"
+  },
+  {
+    "decision": "BLOCK",
+    "policy_id": "example-combined",
+    "policy_version": 1,
+    "rule_id": "ALLOWLIST-001",
+    "reason_code": "allowlist_required",
+    "timestamp": "2026-09-03T00:00:00.000Z"
+  },
+  {
+    "decision": "FLAG",
+    "policy_id": "example-combined",
+    "policy_version": 1,
+    "rule_id": "SANCTIONS-001",
+    "reason_code": "sanctions_match",
+    "timestamp": "2026-09-03T00:00:00.000Z"
+  },
+  {
+    "decision": "BLOCK",
+    "policy_id": "example-combined",
+    "policy_version": 1,
+    "reason_code": "account_frozen",
+    "timestamp": "2026-09-03T00:00:00.000Z"
+  },
+  {
+    "decision": "BLOCK",
+    "policy_id": "example-combined",
+    "policy_version": 1,
+    "rule_id": "JURISDICTION-001",
+    "reason_code": "jurisdiction_prohibited",
+    "timestamp": "2026-09-03T00:00:00.000Z"
+  },
+  {
+    "decision": "BLOCK",
+    "policy_id": "example-combined",
+    "policy_version": 1,
+    "rule_id": "JURISDICTION-001",
+    "reason_code": "jurisdiction_unknown",
+    "timestamp": "2026-09-03T00:00:00.000Z"
+  }
+]
