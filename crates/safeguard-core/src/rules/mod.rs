@@ -14,4 +14,6 @@
 //! and independently testable.
 
 pub mod account_status;
+pub mod allowlist;
+pub mod denylist;
 pub mod jurisdiction;
