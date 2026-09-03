@@ -68,6 +68,22 @@ impl PolicyContract {
         admin::remove_authority(&env, &authority)
     }
 
+    /// The current policy authorities (public read).
+    pub fn policy_authorities(env: Env) -> Vec<Address> {
+        admin::get_policy_authorities(&env)
+    }
+
+    /// Add a policy authority (may activate/deactivate versions).
+    /// Requires the admin's auth.
+    pub fn add_policy_authority(env: Env, authority: Address) -> Result<(), ContractError> {
+        admin::add_policy_authority(&env, &authority)
+    }
+
+    /// Remove a policy authority. Requires the admin's auth.
+    pub fn remove_policy_authority(env: Env, authority: Address) -> Result<(), ContractError> {
+        admin::remove_policy_authority(&env, &authority)
+    }
+
     // ------------------------------------------------------------- lifecycle
 
     /// Register a new draft version of a policy. Admin only; append-only.
@@ -82,14 +98,24 @@ impl PolicyContract {
     }
 
     /// Activate a draft version, superseding the previous active version.
-    /// Admin only.
-    pub fn activate_version(env: Env, policy_id: Id, version: u32) -> Result<(), ContractError> {
-        lifecycle::activate_version(&env, &policy_id, version)
+    /// Admin or policy authority.
+    pub fn activate_version(
+        env: Env,
+        operator: Address,
+        policy_id: Id,
+        version: u32,
+    ) -> Result<(), ContractError> {
+        lifecycle::activate_version(&env, &operator, &policy_id, version)
     }
 
-    /// Deactivate the active version of a policy. Admin only.
-    pub fn deactivate_version(env: Env, policy_id: Id, version: u32) -> Result<(), ContractError> {
-        lifecycle::deactivate_version(&env, &policy_id, version)
+    /// Deactivate the active version of a policy. Admin or policy authority.
+    pub fn deactivate_version(
+        env: Env,
+        operator: Address,
+        policy_id: Id,
+        version: u32,
+    ) -> Result<(), ContractError> {
+        lifecycle::deactivate_version(&env, &operator, &policy_id, version)
     }
 
     /// The record of a specific policy version (public read).
