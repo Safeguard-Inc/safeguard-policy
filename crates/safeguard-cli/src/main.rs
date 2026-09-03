@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 mod commands;
+mod fixtures;
 
 /// The policy-schema version the CLI understands (mirrors the contract's
 /// `schema_version` entrypoint).
@@ -51,6 +52,20 @@ enum Command {
         /// Path to a facts JSON document.
         facts: PathBuf,
     },
+    /// Validate the fixture datasets (accounts, jurisdictions, sanctions).
+    Fixture {
+        #[command(subcommand)]
+        command: FixtureCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum FixtureCommand {
+    /// Validate the fixture datasets.
+    Validate {
+        /// Fixtures directory (defaults to policies/fixtures).
+        path: Option<PathBuf>,
+    },
 }
 
 fn main() {
@@ -60,6 +75,9 @@ fn main() {
         Command::Validate { path } => commands::validate::run(&path),
         Command::Inspect { path } => commands::inspect::run(&path),
         Command::Evaluate { policy, facts } => commands::evaluate::run(&policy, &facts),
+        Command::Fixture {
+            command: FixtureCommand::Validate { path },
+        } => commands::fixture::run(path.as_deref()),
     };
     if let Err(error) = result {
         eprintln!("error: {error:#}");
