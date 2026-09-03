@@ -31,7 +31,10 @@
 //! model, [`version`] for policy versioning and [`policy`] for the policy
 //! configuration carried into evaluation.
 //!
-//! Modules are added as the engine grows; see the crate root docs of each
-//! module for its role within the evaluation model.
-
 #![no_std]
+
+#[cfg(test)]
+extern crate std;
+
+pub mod decision;
+pub mod rule;
