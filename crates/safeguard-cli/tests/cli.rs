@@ -253,6 +253,24 @@ fn registry_inspect_summarizes_each_dataset_kind() {
     ]);
     assert!(ok);
     assert!(stdout.contains("jurisdiction universe"));
+
+    let (ok, stdout, _) = run(&[
+        "registry",
+        "inspect",
+        dir.join("identity.json").to_str().unwrap(),
+    ]);
+    assert!(ok);
+    assert!(stdout.contains("identity dataset"));
+    assert!(stdout.contains("verified"));
+
+    let (ok, stdout, _) = run(&[
+        "registry",
+        "inspect",
+        dir.join("tokens.json").to_str().unwrap(),
+    ]);
+    assert!(ok);
+    assert!(stdout.contains("token registry"));
+    assert!(stdout.contains("institutional-default"));
 }
 
 #[test]
