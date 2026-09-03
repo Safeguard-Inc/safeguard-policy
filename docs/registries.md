@@ -27,18 +27,35 @@ passed in as a resolved fact by the caller (hooks).
 
 | Registry | Holds | Current state |
 | -------- | ----- | ------------- |
-| Identity | Account → identity reference, verification status, jurisdiction, attestation reference, expiry. No PII: references, hashes, provider ids. | Caller-resolved facts (`EvaluationInput`) — the contract receives resolved status/membership flags. On-chain identity registry is Phase 4. |
-| Sanctions | Subject hash, list id, status, dataset version, effective time, source. | Normalized dataset shape defined (`policy-schema/sanctions.schema.json`); matching is caller-resolved today; on-chain screening registry is Phase 4. |
-| Jurisdiction | Account/region classification. | Region classification defined (`jurisdiction.schema.json`); resolved per subject and passed in. |
+| Identity | Account → verification status, attestation reference, expiry. No PII: references, hashes, provider ids. | **On-chain today**: `set_identity` / `remove_identity` / `identity` (admin or registry authority). Read by hooks/audit; verification status is not an engine input. |
+| Sanctions | Subject hash, list id, status, dataset version, effective time, source. | **On-chain today**: `set_sanctions_entry` / `retire_sanctions_entry` / `sanctions_entry` plus `evaluate` resolution — an active entry for the subject hash makes the sanctions rule fire regardless of the caller's claim. |
+| Jurisdiction | Account → region code. | **On-chain today**: `set_jurisdiction` / `clear_jurisdiction` / `jurisdiction` plus `evaluate` resolution — a stored classification wins over the caller's claim. |
 | Token | Policy → bound Confidential Tokens. | **On-chain today**: `bind_token` / `unbind_token` / `bound_tokens`. `evaluate` refuses unbound tokens. |
 
 ## Why registries are not a centralized database
 
-The token registry is on-chain because scope must be verifiable and shared.
-The identity/sanctions/jurisdiction registries are represented on-chain
-(Phase 4) as **deterministic snapshots or attestations**, not as a live
-central database: entries are normalized, versioned and replaceable, and
-nothing in the evaluation path depends on a network round-trip.
+The registries are on-chain because snapshots must be verifiable and
+shared, but they are **deterministic snapshots or attestations**, not a
+live central database: entries are normalized, versioned and replaceable
+by the registry authority, and nothing in the evaluation path depends on a
+network round-trip or on a registry being present — with no entry,
+`evaluate` falls back to the caller's resolved facts.
+
+## Authoritativeness in `evaluate`
+
+Where an entry exists, the registry is authoritative and the caller's
+claim is ignored for that fact:
+
+| Fact | Registry lookup | Authoritative value |
+| ---- | --------------- | ------------------- |
+| Sanctions match | `SanctionsEntry(subject_hash)` | `true` when the entry is active, `false` when retired |
+| Jurisdiction | `Jurisdiction(account)` | the stored `RegionStatus` code |
+| Identity | (storage only — no engine input) | hooks/audit read it; evaluation is unaffected |
+
+No entry → caller-claim fallback, so deployments without registries behave
+identically to the pre-registry contract. The identity registry stores
+verification status for hooks and audit rather than feeding the engine,
+which keeps the engine free of semantics the policy does not own.
 
 ## Privacy
 
@@ -60,5 +77,6 @@ not silently expire (see [`security.md`](security.md)).
 
 - [`adapters.md`](adapters.md) — how external data becomes normalized entries
 - [`rule-engine.md`](rule-engine.md) — how registry facts feed decisions
-- [`contract-interface.md`](contract-interface.md) — the token registry entrypoints
+- [`contract-interface.md`](contract-interface.md) — registry entrypoints and storage layout
+- [`security.md`](security.md) — registry authority role and data hygiene
 - `../policy-schema/sanctions.schema.json`, `jurisdiction.schema.json`

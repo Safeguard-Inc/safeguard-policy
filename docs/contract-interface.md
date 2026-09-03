@@ -34,6 +34,24 @@ The on-chain surface of `safeguard-contract`. This is the reference for
 | `unbind_token(operator, policy_id, token)` | admin or authority | Remove a token from a policy's scope. Idempotent. |
 | `bound_tokens(policy_id) -> Vec<Address>` | public | List tokens covered by a policy. |
 
+### Compliance registries
+
+Deterministic snapshots of external compliance information (see
+[`registries.md`](registries.md)); all writes require admin or a registry
+authority, reads are public.
+
+| Function | Auth | Description |
+| -------- | ---- | ----------- |
+| `set_identity(operator, account, status, attestation_ref, expires_at)` | admin or authority | Write/replace an account's verification record. Unknown status codes fail `InvalidRegistryData`. |
+| `remove_identity(operator, account)` | admin or authority | Remove an account's verification record. |
+| `identity(account) -> Option<IdentityRecord>` | public | Read the stored record. |
+| `set_sanctions_entry(operator, subject_hash, list_id, status, dataset_version, effective_at, source)` | admin or authority | Upsert a normalized entry. Status must be a known `SanctionsStatus` and `dataset_version >= 1`. |
+| `retire_sanctions_entry(operator, subject_hash)` | admin or authority | Flip an entry to inactive — never deletes, so history stays readable. |
+| `sanctions_entry(subject_hash) -> Option<SanctionsEntryRecord>` | public | Read the stored entry. |
+| `set_jurisdiction(operator, account, region)` | admin or authority | Set/replace an account's region code. Unknown codes fail `InvalidRegistryData`. |
+| `clear_jurisdiction(operator, account)` | admin or authority | Remove an account's region code. |
+| `jurisdiction(account) -> Option<u32>` | public | Read the stored region code. |
+
 ### Evaluation
 
 | Function | Auth | Description |
@@ -41,11 +59,18 @@ The on-chain surface of `safeguard-contract`. This is the reference for
 | `evaluate(policy_id, token, input) -> EvaluationResult` | public | Evaluate a subject against the active version for a bound token. Read-only and deterministic. |
 
 `EvaluationInput` carries the caller-resolved facts (account status code,
-allowlist membership, denylist/sanctions match flags, jurisdiction code);
-`EvaluationResult` returns the active policy version, decision code, reason
-code and the triggering rule id. Unknown status/region codes fail closed to
-the core `Unknown` variants. Errors are scope/configuration only:
-`PolicyNotActive`, `TokenNotBound`, `InvalidRuleSet`.
+allowlist membership, denylist match flag, sanctions match claim,
+jurisdiction code, and the `subject` hash + `account` that key the
+on-chain registries). `EvaluationResult` returns the active policy version,
+decision code, reason code and the triggering rule id.
+
+**Registry resolution.** When the compliance registries hold an entry, the
+sanctions match and the jurisdiction classification are resolved from the
+registry — an active sanctions entry always matches, a stored region always
+wins — and the caller's claims are used only as the no-entry fallback.
+Unknown status/region codes still fail closed to the core `Unknown`
+variants. Errors are scope/configuration only: `PolicyNotActive`,
+`TokenNotBound`, `InvalidRuleSet`.
 
 `schema_version() -> u32` returns the policy-schema version this contract
 speaks — the gate consumers should check before relying on serialization.
@@ -68,6 +93,7 @@ Stable, never renumbered (see [`versioning.md`](versioning.md)):
 | 10 | `InvalidPolicyId` | Reserved/invalid policy id. |
 | 11 | `VersionExists` | Append-only registration violated. |
 | 12 | `VersionNotActive` | Deactivation of a non-active version. |
+| 13 | `InvalidRegistryData` | Registry write carried an unknown status/region code or `dataset_version == 0`. |
 
 ## Storage layout
 
@@ -78,21 +104,31 @@ Persistent (TTL-extended on every read/write):
 Version(VersionKey{policy_id, version}) → PolicyVersionRecord
 ActiveVersion(policy_id)                → u32
 TokenBindings(policy_id)                → Vec<Address>
+Identity(account)                       → IdentityRecord{status, attestation_ref, expires_at}
+SanctionsEntry(subject_hash)            → SanctionsEntryRecord{list_id, status, dataset_version, effective_at, source}
+Jurisdiction(account)                   → u32 (RegionStatus code)
 ```
 
-All multi-byte ids are fixed 32-byte `BytesN<32>` values.
+All multi-byte ids are fixed 32-byte `BytesN<32>` values. Sanctions entries
+are keyed by subject hash — never raw identifiers or PII.
 
 ## Events
 
-Typed `contractevent`s, published by the lifecycle:
+Typed `contractevent`s published by the lifecycle and registries:
 
 | Event | Payload |
 | ----- | ------- |
 | `policy_created` | policy_id, version, config_hash |
 | `policy_activated` | policy_id, version, config_hash |
 | `policy_deactivated` | policy_id, version |
+| `identity_updated` | account, status, attestation_ref, expires_at |
+| `identity_removed` | account |
+| `sanctions_entry_updated` | subject_hash, status, dataset_version |
+| `jurisdiction_updated` | account, region |
+| `jurisdiction_cleared` | account |
 
-These are the **configuration-change** events audit consumes. Transfer-level
+These are the **configuration-change** events audit consumes (the
+`registry_updated` family covers compliance-data mutations). Transfer-level
 events (`transfer_approved`, `transfer_blocked`) belong to `safeguard-hooks`.
 
 Note for tests: in soroban-sdk 27 testutils, recorded events are scoped to
