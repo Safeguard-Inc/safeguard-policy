@@ -1,0 +1,28 @@
+[package]
+name = "safeguard-adapters"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Off-chain adapters converting external compliance data into Safeguard's normalized registry datasets"
+keywords = ["stellar", "soroban", "compliance", "sanctions", "adapters"]
+categories = ["cryptography::cryptocurrencies"]
+
+[lints]
+workspace = true
+
+[dependencies]
+safeguard-sdk = { path = "../safeguard-sdk", version = "0.1.0" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+# NFD decomposition for accent-insensitive subject canonicalization
+# (precomposed é must become e + combining accent so stripping yields the
+# base letter, never an empty slot).
+unicode-normalization = "0.1"
+
+[dev-dependencies]
+# Golden adapter tests compare provider sample input against expected
+# normalized output.
+proptest = "1"
