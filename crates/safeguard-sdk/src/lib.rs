@@ -12,8 +12,11 @@
 //! a live contract) is done through the generated contract client from
 //! `safeguard-contract`; see `docs/sdk.md`.
 
+pub mod evaluate;
 pub mod model;
 pub mod validation;
+
+pub use evaluate::EvaluationFacts;
 
 pub use safeguard_core::decision::{Decision, PolicyDecision, ReasonCode};
 pub use safeguard_core::evaluation::EvaluationRequest;
