@@ -52,6 +52,8 @@ pub enum DataKey {
     Admin,
     /// instance: additional registry authorities.
     Authorities,
+    /// instance: policy authorities (may activate/deactivate versions).
+    PolicyAuthorities,
     /// persistent: configuration record of a policy version.
     Version(VersionKey),
     /// persistent: the active version number of a policy.
@@ -159,6 +161,19 @@ pub fn set_authorities(env: &Env, addresses: &Vec<Address>) {
     env.storage()
         .instance()
         .set(&DataKey::Authorities, addresses);
+}
+
+pub fn policy_authorities(env: &Env) -> Vec<Address> {
+    env.storage()
+        .instance()
+        .get(&DataKey::PolicyAuthorities)
+        .unwrap_or_else(|| vec![env])
+}
+
+pub fn set_policy_authorities(env: &Env, addresses: &Vec<Address>) {
+    env.storage()
+        .instance()
+        .set(&DataKey::PolicyAuthorities, addresses);
 }
 
 // -------------------------------------------------------------- persistent
