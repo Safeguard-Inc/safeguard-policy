@@ -44,6 +44,13 @@ enum Command {
         /// Path to a policy JSON document.
         path: PathBuf,
     },
+    /// Evaluate a subject offline (same engine as the contract).
+    Evaluate {
+        /// Path to a policy JSON document.
+        policy: PathBuf,
+        /// Path to a facts JSON document.
+        facts: PathBuf,
+    },
 }
 
 fn main() {
@@ -52,6 +59,7 @@ fn main() {
         Command::Version => commands::version::run(),
         Command::Validate { path } => commands::validate::run(&path),
         Command::Inspect { path } => commands::inspect::run(&path),
+        Command::Evaluate { policy, facts } => commands::evaluate::run(&policy, &facts),
     };
     if let Err(error) = result {
         eprintln!("error: {error:#}");
