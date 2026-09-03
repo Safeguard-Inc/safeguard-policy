@@ -1344,6 +1344,15 @@ name = "safeguard-core"
 version = "0.1.0"
 
 [[package]]
+name = "safeguard-sdk"
+version = "0.1.0"
+dependencies = [
+ "safeguard-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "schemars"
 version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"

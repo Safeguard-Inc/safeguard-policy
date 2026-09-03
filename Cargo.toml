@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/safeguard-contract",
     "crates/safeguard-core",
+    "crates/safeguard-sdk",
 ]
 
 [workspace.package]
