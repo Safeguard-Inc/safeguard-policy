@@ -23,7 +23,7 @@
 //! Accessors are the only code that touches storage, keeping the key layout
 //! reviewable in one place.
 
-use soroban_sdk::{contracttype, vec, Address, BytesN, Env, IntoVal, TryFromVal, Val, Vec};
+use soroban_sdk::{contracttype, vec, Address, Bytes, BytesN, Env, IntoVal, TryFromVal, Val, Vec};
 
 use crate::error::ContractError;
 
@@ -58,6 +58,12 @@ pub enum DataKey {
     ActiveVersion(Id),
     /// persistent: tokens covered by a policy.
     TokenBindings(Id),
+    /// persistent: identity verification record of an account.
+    Identity(Address),
+    /// persistent: normalized sanctions entry, keyed by subject hash.
+    SanctionsEntry(Id),
+    /// persistent: jurisdiction classification of an account.
+    Jurisdiction(Address),
 }
 
 /// On-chain rule record (category/action stored by stable core code).
@@ -80,6 +86,41 @@ pub struct PolicyVersionRecord {
     /// Config hash (sha-256 of the serialized rule set).
     pub config_hash: Id,
     pub rules: Vec<RuleRecord>,
+}
+
+/// On-chain identity verification record of an account.
+///
+/// Holds no PII: `attestation_ref` is a reference/hash to the attestation
+/// held off-chain by the provider, never the attestation itself.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IdentityRecord {
+    /// [`safeguard_core::registries::identity::IdentityStatus`] code.
+    pub status: u32,
+    /// Reference/hash of the backing attestation (32-byte id width).
+    pub attestation_ref: Id,
+    /// Ledger timestamp at which the attestation expires (0 = never).
+    pub expires_at: u64,
+}
+
+/// On-chain normalized sanctions entry, keyed by 32-byte subject hash.
+///
+/// Mirrors `policy-schema/sanctions.schema.json` with `effective_at`
+/// converted from RFC 3339 to epoch seconds by the adapter. Entries are
+/// never deleted on-chain: retiring one flips its status to inactive.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SanctionsEntryRecord {
+    /// Source list identifier (e.g. `OFAC-SDN`), 32-byte id width.
+    pub list_id: Id,
+    /// [`safeguard_core::registries::sanctions::SanctionsStatus`] code.
+    pub status: u32,
+    /// Monotonic version of the dataset this entry belongs to.
+    pub dataset_version: u32,
+    /// Epoch seconds the listing became effective (RFC 3339 converted).
+    pub effective_at: u64,
+    /// Source identifier (adapter/authority), e.g. `ofac`.
+    pub source: Bytes,
 }
 
 /// Extend the TTL of a persistent key past the next read/write.
@@ -178,4 +219,42 @@ pub fn token_bindings(env: &Env, policy_id: &Id) -> Vec<Address> {
 
 pub fn set_token_bindings(env: &Env, policy_id: &Id, tokens: &Vec<Address>) {
     set_persistent(env, &DataKey::TokenBindings(policy_id.clone()), tokens);
+}
+
+// ------------------------------------------------------------- registries
+
+pub fn identity_record(env: &Env, account: &Address) -> Option<IdentityRecord> {
+    get_persistent(env, &DataKey::Identity(account.clone()))
+}
+
+pub fn set_identity_record(env: &Env, account: &Address, record: &IdentityRecord) {
+    set_persistent(env, &DataKey::Identity(account.clone()), record);
+}
+
+pub fn remove_identity_record(env: &Env, account: &Address) {
+    env.storage()
+        .persistent()
+        .remove(&DataKey::Identity(account.clone()));
+}
+
+pub fn sanctions_entry(env: &Env, subject_hash: &Id) -> Option<SanctionsEntryRecord> {
+    get_persistent(env, &DataKey::SanctionsEntry(subject_hash.clone()))
+}
+
+pub fn set_sanctions_entry(env: &Env, subject_hash: &Id, record: &SanctionsEntryRecord) {
+    set_persistent(env, &DataKey::SanctionsEntry(subject_hash.clone()), record);
+}
+
+pub fn jurisdiction(env: &Env, account: &Address) -> Option<u32> {
+    get_persistent(env, &DataKey::Jurisdiction(account.clone()))
+}
+
+pub fn set_jurisdiction(env: &Env, account: &Address, region: u32) {
+    set_persistent(env, &DataKey::Jurisdiction(account.clone()), &region);
+}
+
+pub fn clear_jurisdiction(env: &Env, account: &Address) {
+    env.storage()
+        .persistent()
+        .remove(&DataKey::Jurisdiction(account.clone()));
 }
