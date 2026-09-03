@@ -79,3 +79,28 @@ pub fn identity_removed(env: &Env, account: &Address) {
     }
     .publish(env);
 }
+
+/// A subject's sanctions entry was written, replaced or retired.
+/// `status` is a [`safeguard_core::registries::sanctions::SanctionsStatus`]
+/// code; retirement is an update to `inactive`, never a deletion.
+#[contractevent]
+pub struct SanctionsEntryUpdated {
+    #[topic]
+    pub subject_hash: Id,
+    pub status: u32,
+    pub dataset_version: u32,
+}
+
+/// Publish a sanctions entry write/replace/retire.
+pub fn sanctions_entry_updated(
+    env: &Env,
+    subject_hash: &Id,
+    record: &crate::storage::SanctionsEntryRecord,
+) {
+    SanctionsEntryUpdated {
+        subject_hash: subject_hash.clone(),
+        status: record.status,
+        dataset_version: record.dataset_version,
+    }
+    .publish(env);
+}

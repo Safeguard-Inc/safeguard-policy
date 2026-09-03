@@ -18,9 +18,9 @@ use crate::admin;
 use crate::error::ContractError;
 use crate::evaluate::{self, EvaluationInput, EvaluationResult};
 use crate::lifecycle;
-use crate::registries::identity;
+use crate::registries::{identity, sanctions};
 use crate::registry;
-use crate::storage::{Id, IdentityRecord, PolicyVersionRecord, RuleRecord};
+use crate::storage::{Id, IdentityRecord, PolicyVersionRecord, RuleRecord, SanctionsEntryRecord};
 
 #[contract]
 pub struct PolicyContract;
@@ -171,6 +171,46 @@ impl PolicyContract {
     /// An account's identity verification record (public read).
     pub fn identity(env: Env, account: Address) -> Option<IdentityRecord> {
         identity::identity(&env, &account)
+    }
+
+    /// Write (or replace) a normalized sanctions entry for a subject hash.
+    /// Admin or registry authority.
+    #[allow(clippy::too_many_arguments)]
+    pub fn set_sanctions_entry(
+        env: Env,
+        operator: Address,
+        subject_hash: Id,
+        list_id: Id,
+        status: u32,
+        dataset_version: u32,
+        effective_at: u64,
+        source: soroban_sdk::Bytes,
+    ) -> Result<(), ContractError> {
+        sanctions::set_sanctions_entry(
+            &env,
+            &operator,
+            &subject_hash,
+            &list_id,
+            status,
+            dataset_version,
+            effective_at,
+            &source,
+        )
+    }
+
+    /// Retire a sanctions entry (flip to inactive, never delete).
+    /// Admin or registry authority.
+    pub fn retire_sanctions_entry(
+        env: Env,
+        operator: Address,
+        subject_hash: Id,
+    ) -> Result<(), ContractError> {
+        sanctions::retire_sanctions_entry(&env, &operator, &subject_hash)
+    }
+
+    /// A subject's sanctions entry (public read).
+    pub fn sanctions_entry(env: Env, subject_hash: Id) -> Option<SanctionsEntryRecord> {
+        sanctions::sanctions_entry(&env, &subject_hash)
     }
 
     // ------------------------------------------------------------ evaluation
