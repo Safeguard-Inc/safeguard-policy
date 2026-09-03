@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Local full-gate runner: everything CI enforces, in one command.
 #
-#   ./scripts/ci.sh          # everything (rust + schema + typescript + security + scripts)
+#   ./scripts/ci.sh          # everything (rust + schema + typescript + security + scripts + publish)
 #   ./scripts/ci.sh rust      # fmt, clippy, tests, wasm artifact build
 #   ./scripts/ci.sh schema    # schema battery, fixtures, reference policies
 #   ./scripts/ci.sh typescript # TS SDK typecheck + tests
 #   ./scripts/ci.sh security  # cargo-deny + npm audit
 #   ./scripts/ci.sh scripts   # runbook syntax, dry-runs, adapter sample
+#   ./scripts/ci.sh publish   # publish-readiness (cargo package, npm pack)
 #
 # Exits non-zero on the first failing step.
 
@@ -62,6 +63,26 @@ security_gate() {
     (cd sdk/typescript && npm audit --audit-level=high)
 }
 
+publish_gate() {
+    echo "==> cargo package (all workspace crates)"
+    for crate in core sdk adapters cli contract; do
+        cargo package -p "safeguard-$crate" --list --allow-dirty >/dev/null
+        echo "    safeguard-$crate packages cleanly"
+    done
+
+    echo "==> npm pack (TypeScript SDK tarball)"
+    (cd sdk/typescript && npm pack --dry-run >/dev/null)
+
+    echo "==> npm tarball excludes test artifacts"
+    (cd sdk/typescript && npm pack --dry-run --json) | python3 -c "
+import json, sys
+d = json.load(sys.stdin)[0]
+leaked = [f['path'] for f in d['files'] if '/test/' in f['path']]
+assert not leaked, f'test artifacts leaked into the npm package: {leaked}'
+print('    tarball is publish-clean')
+"
+}
+
 scripts_gate() {
     echo "==> shell script syntax (bash -n)"
     for script in scripts/*.sh; do
@@ -92,7 +113,8 @@ case "${1:-all}" in
     typescript) typescript_gate ;;
     security)   security_gate ;;
     scripts)    scripts_gate ;;
-    all)        rust_gate; schema_gate; typescript_gate; security_gate; scripts_gate ;;
+    publish)    publish_gate ;;
+    all)        rust_gate; schema_gate; typescript_gate; security_gate; scripts_gate; publish_gate ;;
     *)
         echo "usage: $0 [rust|schema|typescript|security|scripts|all]" >&2
         exit 2
