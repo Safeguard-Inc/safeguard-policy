@@ -104,3 +104,36 @@ pub fn sanctions_entry_updated(
     }
     .publish(env);
 }
+
+/// An account's region classification was written or replaced.
+/// `region` is a [`safeguard_core::rules::jurisdiction::RegionStatus`] code.
+#[contractevent]
+pub struct JurisdictionUpdated {
+    #[topic]
+    pub account: Address,
+    pub region: u32,
+}
+
+/// An account's region classification was removed.
+#[contractevent]
+pub struct JurisdictionCleared {
+    #[topic]
+    pub account: Address,
+}
+
+/// Publish a jurisdiction classification write/replace.
+pub fn jurisdiction_updated(env: &Env, account: &Address, region: u32) {
+    JurisdictionUpdated {
+        account: account.clone(),
+        region,
+    }
+    .publish(env);
+}
+
+/// Publish a jurisdiction classification removal.
+pub fn jurisdiction_cleared(env: &Env, account: &Address) {
+    JurisdictionCleared {
+        account: account.clone(),
+    }
+    .publish(env);
+}

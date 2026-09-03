@@ -17,5 +17,5 @@
 //! [`crate::evaluate`].
 
 pub mod identity;
+pub mod jurisdiction;
 pub mod sanctions;
-// (jurisdiction registry lands in the next commit)

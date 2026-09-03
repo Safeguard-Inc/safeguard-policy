@@ -18,7 +18,7 @@ use crate::admin;
 use crate::error::ContractError;
 use crate::evaluate::{self, EvaluationInput, EvaluationResult};
 use crate::lifecycle;
-use crate::registries::{identity, sanctions};
+use crate::registries::{identity, jurisdiction, sanctions};
 use crate::registry;
 use crate::storage::{Id, IdentityRecord, PolicyVersionRecord, RuleRecord, SanctionsEntryRecord};
 
@@ -211,6 +211,32 @@ impl PolicyContract {
     /// A subject's sanctions entry (public read).
     pub fn sanctions_entry(env: Env, subject_hash: Id) -> Option<SanctionsEntryRecord> {
         sanctions::sanctions_entry(&env, &subject_hash)
+    }
+
+    /// Set (or replace) an account's region classification.
+    /// Admin or registry authority.
+    pub fn set_jurisdiction(
+        env: Env,
+        operator: Address,
+        account: Address,
+        region: u32,
+    ) -> Result<(), ContractError> {
+        jurisdiction::set_jurisdiction(&env, &operator, &account, region)
+    }
+
+    /// Remove an account's region classification. Admin or registry
+    /// authority.
+    pub fn clear_jurisdiction(
+        env: Env,
+        operator: Address,
+        account: Address,
+    ) -> Result<(), ContractError> {
+        jurisdiction::clear_jurisdiction(&env, &operator, &account)
+    }
+
+    /// An account's stored region code (public read).
+    pub fn jurisdiction(env: Env, account: Address) -> Option<u32> {
+        jurisdiction::jurisdiction(&env, &account)
     }
 
     // ------------------------------------------------------------ evaluation
