@@ -188,3 +188,121 @@ fn missing_files_fail_cleanly() {
     assert!(!ok);
     assert!(stderr.contains("reading"));
 }
+
+/// The fixtures directory of the repository (three levels up from the test
+/// binary's manifest dir).
+fn repo_fixtures_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("policies/fixtures")
+}
+
+#[test]
+fn fixture_validate_accepts_the_shipped_fixtures() {
+    let (ok, stdout, stderr) = run(&["fixture", "validate", repo_fixtures_dir().to_str().unwrap()]);
+    assert!(ok, "shipped fixtures must validate: {stderr}");
+    assert!(stdout.contains("OK:"));
+    assert!(stdout.contains("accounts"));
+    assert!(stdout.contains("sanctions entries"));
+}
+
+#[test]
+fn fixture_validate_rejects_a_corrupt_dataset() {
+    // A jurisdiction code outside the universe must be flagged.
+    let dir = temp_dir_with(
+        "fixture-corrupt",
+        &[
+            (
+                "accounts.json",
+                r#"{"accounts": [{
+                    "account": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+                    "status": "active",
+                    "jurisdiction": "ZZ",
+                    "allowlisted": true,
+                    "denylisted": false
+                }]}"#,
+            ),
+            (
+                "jurisdictions.json",
+                r#"{"permitted": ["US"], "restricted": [], "prohibited": []}"#,
+            ),
+        ],
+    );
+    let (ok, _, stderr) = run(&["fixture", "validate", dir.to_str().unwrap()]);
+    assert!(!ok);
+    assert!(stderr.contains("not in jurisdictions.json"));
+}
+
+#[test]
+fn registry_inspect_summarizes_each_dataset_kind() {
+    let dir = repo_fixtures_dir();
+    let (ok, stdout, _) = run(&[
+        "registry",
+        "inspect",
+        dir.join("sanctions.json").to_str().unwrap(),
+    ]);
+    assert!(ok);
+    assert!(stdout.contains("sanctions dataset"));
+    assert!(stdout.contains("active"));
+    assert!(stdout.contains("OFAC-SDN"));
+
+    let (ok, stdout, _) = run(&[
+        "registry",
+        "inspect",
+        dir.join("jurisdictions.json").to_str().unwrap(),
+    ]);
+    assert!(ok);
+    assert!(stdout.contains("jurisdiction universe"));
+}
+
+#[test]
+fn registry_inspect_rejects_unknown_shapes() {
+    let dir = temp_dir_with("registry-junk", &[("junk.json", "{\"nope\": true}")]);
+    let (ok, _, stderr) = run(&[
+        "registry",
+        "inspect",
+        dir.join("junk.json").to_str().unwrap(),
+    ]);
+    assert!(!ok);
+    assert!(stderr.contains("unrecognized dataset shape"));
+}
+
+#[test]
+fn policy_test_reports_the_expected_decisions() {
+    let dir = repo_fixtures_dir();
+    let policy = temp_file("combined.json", VALID_POLICY);
+    let (ok, stdout, _) = run(&[
+        "policy",
+        "test",
+        policy.to_str().unwrap(),
+        "--fixtures-dir",
+        dir.to_str().unwrap(),
+    ]);
+    assert!(ok);
+    assert!(stdout.contains("summary:"));
+    assert!(stdout.contains("APPROVE"));
+    assert!(stdout.contains("BLOCK"));
+
+    // Strict mode turns the blocked subjects into a non-zero exit.
+    let (strict_ok, _, stderr) = run(&[
+        "policy",
+        "test",
+        policy.to_str().unwrap(),
+        "--fixtures-dir",
+        dir.to_str().unwrap(),
+        "--strict",
+    ]);
+    assert!(!strict_ok);
+    assert!(stderr.contains("evaluated to BLOCK"));
+}
+
+/// Create a temporary fixtures dir containing the given files.
+fn temp_dir_with(name: &str, files: &[(&str, &str)]) -> PathBuf {
+    let dir =
+        std::env::temp_dir().join(format!("safeguard-cli-test-{}-{name}", std::process::id()));
+    fs::create_dir_all(&dir).expect("create temp dir");
+    for (file, content) in files {
+        fs::write(dir.join(file), content).expect("write temp fixture");
+    }
+    dir
+}
