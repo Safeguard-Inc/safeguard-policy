@@ -1,0 +1,43 @@
+name: Policy change
+description: Propose or discuss a change to a reference policy or the policy model
+title: "[POLICY] "
+labels: [policy]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Policy changes deserve review like code changes: they change what
+        enforcement means. Every change is a **new version**, never an edit
+        to a published one.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of change
+      options:
+        - Reference policy (policies/)
+        - Policy model (core/versioning semantics)
+        - Rule semantics (docs/rule-engine.md)
+        - Schema change (policy-schema/)
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Rationale
+      description: Why is the change needed, and what is the desired effect on decisions?
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact on decisions
+      description: Which existing decisions change (which rule, which outcome, which reason code)?
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility
+      description: Does this touch stable codes, labels, schemas or the precedence order? If so, describe the versioning impact (docs/versioning.md).
+    validations:
+      required: true

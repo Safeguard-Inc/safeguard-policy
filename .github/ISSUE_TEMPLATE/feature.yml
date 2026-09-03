@@ -1,0 +1,45 @@
+name: Feature request
+description: A new capability for the policy layer
+title: "[FEATURE] "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the capability, who needs it, and how it fits the Safeguard
+        boundaries (define here, enforce in safeguard-hooks, verify in
+        safeguard-audit). If it belongs to another repository, say so.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What need does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed shape
+      description: Sketch the interface or behavior. Schemas, entrypoints and precedence changes deserve particular precision.
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - safeguard-core (engine)
+        - safeguard-contract (on-chain)
+        - policy-schema / policies
+        - scripts / CI
+        - docs
+        - other repository (say where)
+    validations:
+      required: true
+  - type: textarea
+    id: testing
+    attributes:
+      label: Testing plan
+      description: How should this be tested (unit, integration, property, schema negative cases)?
+    validations:
+      required: true

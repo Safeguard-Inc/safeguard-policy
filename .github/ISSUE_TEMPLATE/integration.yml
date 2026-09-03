@@ -1,0 +1,32 @@
+name: Integration
+description: Questions and issues about consuming safeguard-policy from hooks, audit, SDKs or deployments
+title: "[INTEGRATION] "
+labels: [integration]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For consuming this repository from safeguard-hooks, safeguard-audit,
+        SDKs or a deployment. Interface questions are best framed against
+        docs/contract-interface.md and the schemas in policy-schema/.
+  - type: textarea
+    id: context
+    attributes:
+      label: Integration context
+      description: What are you integrating with, and what are you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Question or gap
+      description: What is unclear, missing, or not working?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Desired outcome
+      description: What would a working integration look like?
+    validations:
+      required: true
