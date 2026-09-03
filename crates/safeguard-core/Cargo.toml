@@ -13,3 +13,8 @@ categories = ["cryptography::cryptocurrencies"]
 workspace = true
 
 [dependencies]
+
+[dev-dependencies]
+# Property/fuzz tests live in tests/properties.rs. Dev-only: the library
+# itself stays dependency-free and no_std.
+proptest = "1"
