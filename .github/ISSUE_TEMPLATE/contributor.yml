@@ -1,0 +1,51 @@
+name: Contributor task
+description: A scoped, well-defined task suitable for a first-time or community contributor
+title: "[SC] "
+labels: [good first issue]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This template describes a scoped contributor task. Categories follow
+        the issue taxonomy in CONTRIBUTING.md; pick the category as the title
+        prefix and as the label so the issue pool stays filterable.
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: The area of the repository this task touches.
+      options:
+        - "SC — Smart Contract (policy registry, versioning, rules, evaluation engine, precedence)"
+        - "SDK — Rust/TypeScript clients, registry helpers, error types, serialization"
+        - "CLI — policy validation, inspection, fixture generation, policy testing"
+        - "TEST — rule/registry tests, fuzz tests, regression tests, compatibility tests"
+        - "INFRA — CI, release automation, package publishing, deployment automation"
+        - "DOCS — policy specification, threat model, integration guide, examples"
+        - "SECURITY — threat modeling, access-control review, downgrade/malicious-registry tests"
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Exactly what should be built or changed. Reference the spec section and files touched.
+      placeholder: |
+        - File(s): crates/safeguard-core/src/rules/...
+        - Spec section: §8 contracts/rules
+        - Behavior: ...
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: What must be true for this task to be done? Be concrete — tests, docs, and gate checks.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and constraints
+      description: Determinism, fail-closed semantics, stable codes, and other invariants the task must respect (see docs/security.md, docs/rule-engine.md).
+    validations:
+      required: false

@@ -28,11 +28,16 @@ body:
     attributes:
       label: Scope
       options:
-        - safeguard-core (engine)
-        - safeguard-contract (on-chain)
+        - SC — safeguard-contract (on-chain)
+        - SC — safeguard-core (engine)
+        - SDK — Rust SDK
+        - SDK — TypeScript SDK
+        - CLI — safeguard CLI
         - policy-schema / policies
-        - scripts / CI
-        - docs
+        - TEST — tests / fuzzing
+        - INFRA — CI / release / deployment
+        - DOCS — documentation
+        - SECURITY — threat model / access control
         - other repository (say where)
     validations:
       required: true
