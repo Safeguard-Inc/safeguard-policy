@@ -22,9 +22,11 @@ pub fn run(path: Option<&Path>) -> Result<()> {
 
     if problems.is_empty() {
         println!(
-            "OK: {} accounts, {} sanctions entries, {} region codes",
+            "OK: {} accounts, {} sanctions entries, {} identity records, {} token bindings, {} region codes",
             sets.accounts.len(),
             sets.sanctions.len(),
+            sets.identity.len(),
+            sets.tokens.len(),
             sets.universe.all_codes().len()
         );
         return Ok(());

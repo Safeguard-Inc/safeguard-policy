@@ -62,8 +62,8 @@ pub fn run(policy_path: &Path, fixtures_dir: &Path, strict: bool) -> Result<()> 
         sets.accounts.len()
     );
     println!(
-        "{:<16} {:<10} {:<4} {:<8} {}",
-        "account", "status", "region", "decision", "reason"
+        "{:<16} {:<10} {:<4} {:<8} reason",
+        "account", "status", "region", "decision"
     );
 
     let mut counts = [0usize; 3]; // approve, block, flag

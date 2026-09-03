@@ -24,6 +24,7 @@ pub use evaluate::{EvaluationFacts, FactsFile};
 
 pub use safeguard_core::decision::{Decision, PolicyDecision, ReasonCode};
 pub use safeguard_core::evaluation::EvaluationRequest;
+pub use safeguard_core::registries::identity::IdentityStatus;
 pub use safeguard_core::rule::{Rule, RuleAction, RuleId, RuleType};
 pub use safeguard_core::rules::account_status::AccountStatus;
 pub use safeguard_core::rules::jurisdiction::RegionStatus;

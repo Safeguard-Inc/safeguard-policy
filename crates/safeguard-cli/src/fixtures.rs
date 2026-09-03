@@ -14,6 +14,17 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 
 use safeguard_sdk::registry::{decode_subject_hash, SanctionsDatasetEntry};
+use safeguard_sdk::IdentityStatus;
+
+/// Core `IdentityStatus` labels, mirrored from
+/// `safeguard_core::registries::identity`.
+const IDENTITY_STATUSES: [IdentityStatus; 5] = [
+    IdentityStatus::Verified,
+    IdentityStatus::Unverified,
+    IdentityStatus::Revoked,
+    IdentityStatus::Expired,
+    IdentityStatus::Unknown,
+];
 
 /// One account fixture: a subject plus its resolved facts.
 #[derive(Debug, Clone, Deserialize)]
@@ -50,11 +61,54 @@ impl JurisdictionUniverse {
     }
 }
 
+/// One identity verification record, mirroring `set_identity` on-chain:
+/// attestation reference only, no PII.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IdentityFixture {
+    /// Stellar-style G address.
+    pub account: String,
+    /// Core `IdentityStatus` label.
+    pub status: String,
+    /// Reference to an off-chain attestation (KYC/verification provider).
+    pub attestation_ref: String,
+    /// Unix epoch seconds when the verification expires; 0 = never.
+    pub expires_at: i64,
+}
+
+/// One policy -> token registry binding.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TokenBindingFixture {
+    /// The policy the token is bound to (must exist as a shipped policy).
+    pub policy_id: String,
+    /// Stellar-style token contract address.
+    pub token: String,
+    /// Human-readable annotation; informational only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[allow(dead_code)] // consumed by tools that read the raw file, not by validate
+    pub note: Option<String>,
+}
+
 /// The on-disk wrapper shape of accounts.json (`{ "accounts": [...] }`).
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct AccountsFile {
     accounts: Vec<AccountFixture>,
+}
+
+/// The on-disk wrapper shape of identity.json (`{ "accounts": [...] }`).
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct IdentityFile {
+    accounts: Vec<IdentityFixture>,
+}
+
+/// The on-disk wrapper shape of tokens.json (`{ "bindings": [...] }`).
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TokensFile {
+    bindings: Vec<TokenBindingFixture>,
 }
 
 /// All fixture datasets for a fixtures directory.
@@ -63,6 +117,8 @@ pub struct FixtureSets {
     pub accounts: Vec<AccountFixture>,
     pub universe: JurisdictionUniverse,
     pub sanctions: Vec<SanctionsDatasetEntry>,
+    pub identity: Vec<IdentityFixture>,
+    pub tokens: Vec<TokenBindingFixture>,
 }
 
 /// The reserved sentinel for an unknown jurisdiction.
@@ -95,11 +151,34 @@ pub fn load(dir: &Path) -> Result<FixtureSets> {
         Vec::new()
     };
 
+    // Identity and token fixtures are optional datasets: deployments may
+    // have no verification records or token bindings yet.
+    let identity = load_optional::<IdentityFile>(dir, "identity.json")?
+        .map(|f| f.accounts)
+        .unwrap_or_default();
+    let tokens = load_optional::<TokensFile>(dir, "tokens.json")?
+        .map(|f| f.bindings)
+        .unwrap_or_default();
+
     Ok(FixtureSets {
         accounts,
         universe,
         sanctions,
+        identity,
+        tokens,
     })
+}
+
+/// Load a JSON file if it exists; `None` when absent.
+fn load_optional<T: serde::de::DeserializeOwned>(dir: &Path, name: &str) -> Result<Option<T>> {
+    let path = dir.join(name);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let raw = fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+    serde_json::from_str(&raw)
+        .with_context(|| format!("parsing {name}"))
+        .map(Some)
 }
 
 /// Validate every fixture dataset; returns a list of problems (empty = ok).
@@ -183,6 +262,51 @@ pub fn validate(sets: &FixtureSets) -> Vec<String> {
         }
     }
 
+    // Identity records: well-formed address, known status, non-empty
+    // attestation reference, integer epoch expiry.
+    for record in &sets.identity {
+        if !is_stellar_address(&record.account) {
+            problems.push(format!(
+                "identity: {:?} is not a well-formed G address",
+                record.account
+            ));
+        }
+        if !IDENTITY_STATUSES
+            .iter()
+            .any(|status| status.as_str() == record.status)
+        {
+            problems.push(format!(
+                "identity: {:?} has unknown status {:?}",
+                record.account, record.status
+            ));
+        }
+        if record.attestation_ref.is_empty() {
+            problems.push(format!(
+                "identity: {:?} must carry an attestation_ref",
+                record.account
+            ));
+        }
+        if record.expires_at < 0 {
+            problems.push(format!(
+                "identity: {:?} expires_at must be a non-negative epoch",
+                record.account
+            ));
+        }
+    }
+
+    // Token bindings: well-formed address, non-empty policy id.
+    for binding in &sets.tokens {
+        if binding.policy_id.is_empty() {
+            problems.push("tokens: binding with an empty policy_id".to_owned());
+        }
+        if !is_stellar_address(&binding.token) {
+            problems.push(format!(
+                "tokens: {:?} is not a well-formed Stellar address",
+                binding.token
+            ));
+        }
+    }
+
     problems
 }
 
@@ -194,10 +318,9 @@ fn is_region_code(code: &str) -> bool {
 /// A Stellar-style public key: `G` followed by 55 base-32 characters
 /// (A-Z and 2-7; the digits 0, 1, 8, 9 are not part of the alphabet).
 fn is_stellar_address(address: &str) -> bool {
-    let bytes = address.as_bytes();
-    bytes.len() == 56
-        && bytes[0] == b'G'
-        && bytes[1..]
+    address.len() == 56
+        && address.as_bytes()[0] == b'G'
+        && address.as_bytes()[1..]
             .iter()
-            .all(|byte| matches!(*byte, b'A'..=b'Z') || matches!(*byte, b'2'..=b'7'))
+            .all(|byte| byte.is_ascii_uppercase() || (b'2'..=b'7').contains(byte))
 }
