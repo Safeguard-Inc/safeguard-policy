@@ -113,3 +113,36 @@ across calls would be flaky and misleading (observed empirically, encoded in
 
 **Why.** Keeps tooling installable and auditable; the schema layer must not
 depend on heavyweight or fragile dependencies.
+## D13: Adapters live in their own workspace crate, outputting SDK models
+
+**Decision.** The adapter layer is a separate workspace member
+(`crates/safeguard-adapters`), not a folder inside the SDK or CLI, and its
+output is the SDK's schema-mirroring models (`SanctionsDatasetEntry`, etc.).
+
+**Why.** Adapters are off-chain by rule (never in the Soroban execution
+path), so they can depend on `sha2`/`unicode-normalization` without
+threatening the SDK's lean surface or the contract's wasm. The SDK stays
+the single source of the validated shapes, so adapter output cannot drift
+from what the registry accepts.
+
+## D14: Subject hashing happens on a canonicalized identifier
+
+**Decision.** Sanctions subjects are canonicalized (NFD, lowercase,
+whitespace collapse) and then SHA-256-hashed; the hash, never the text,
+leaves the adapter.
+
+**Why.** Two spellings differing only in case, spacing or accents must
+screen identically across datasets, and no PII may reach the registry.
+Canonicalization happens before hashing so `José` and `Jose` produce the
+same `subject_hash` — a decision unit-tested in the normalizer.
+
+## D15: Deployment payloads are derived deterministically from policy JSON
+
+**Decision.** The deploy/rehearse runbooks compute 32-byte policy ids,
+config hashes and numeric rule records from the shipped policy documents
+at runtime, never from hand-typed constants.
+
+**Why.** Hand-typed payloads rot the moment a policy file changes, and the
+values (byte padding, sha256, rule codes) are exactly what bash gets wrong.
+Deriving them keeps the runbook and the policy in lockstep and makes
+`--dry-run` a faithful preview of the real invocation.
