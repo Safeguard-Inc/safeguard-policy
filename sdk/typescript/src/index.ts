@@ -14,3 +14,4 @@
 export * from "./types";
 export * from "./validate";
 export * from "./decision";
+export * from "./registry";
