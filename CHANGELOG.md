@@ -35,3 +35,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   added to the existing schema job; dependabot for Cargo and GitHub Actions.
 - Contribution tooling: pull request template and issue forms for bugs,
   features, policy changes and integrations.
+- `crates/safeguard-sdk`: off-chain Rust SDK with a policy document model,
+  invariant validation mirroring the Python validator, and offline
+  evaluation through the same core engine compiled into the contract.
+- `crates/safeguard-cli`: the `safeguard` operator CLI (`version`, `validate`,
+  `inspect`, `evaluate`) for offline policy authoring and dry-run decisions.
+- `sdk/typescript`: `@safeguard/policy-sdk` with types mirroring
+  `policy-schema/`, invariant validation and decision-document helpers;
+  tested via Node's built-in test runner.
+- CI: TypeScript SDK job (typecheck + tests) and dependabot coverage for
+  the npm ecosystem.
+- `docs/sdk.md` and `docs/cli.md`: reference documentation for the SDKs and
+  the operator CLI.
