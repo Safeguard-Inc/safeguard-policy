@@ -1634,6 +1634,8 @@ version = "0.1.0"
 dependencies = [
  "proptest",
  "safeguard-core",
+ "safeguard-sdk",
+ "serde_json",
  "soroban-sdk",
 ]
 
