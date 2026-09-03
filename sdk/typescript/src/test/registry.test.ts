@@ -1,8 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { decodeSubjectHash, isSanctionsEntry } from "../registry";
-import type { SanctionsDatasetEntry } from "../registry";
+import {
+  decodeSubjectHash,
+  isIdentityRecord,
+  isSanctionsEntry,
+} from "../registry";
+import type { IdentityRecord, SanctionsDatasetEntry } from "../registry";
 
 const VALID: SanctionsDatasetEntry = {
   subject_hash: "c0ffee0000000000000000000000000000000000000000000000000000000000",
@@ -42,5 +46,33 @@ describe("decodeSubjectHash", () => {
     assert.equal(decodeSubjectHash("zz"), null);
     assert.equal(decodeSubjectHash("abc"), null);
     assert.equal(decodeSubjectHash(""), null);
+  });
+});
+
+const IDENTITY_VALID: IdentityRecord = {
+  account: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+  status: "verified",
+  attestation_ref: "ATT-0001",
+  expires_at: 1893456000,
+};
+
+describe("isIdentityRecord", () => {
+  it("accepts a well-formed record", () => {
+    assert.equal(isIdentityRecord(IDENTITY_VALID), true);
+  });
+
+  it("accepts every identity status", () => {
+    for (const status of ["verified", "unverified", "revoked", "expired", "unknown"]) {
+      assert.equal(isIdentityRecord({ ...IDENTITY_VALID, status }), true);
+    }
+  });
+
+  it("rejects malformed accounts, statuses and expiry", () => {
+    assert.equal(isIdentityRecord({ ...IDENTITY_VALID, account: "not-an-address" }), false);
+    assert.equal(isIdentityRecord({ ...IDENTITY_VALID, status: "bogus" }), false);
+    assert.equal(isIdentityRecord({ ...IDENTITY_VALID, attestation_ref: "" }), false);
+    assert.equal(isIdentityRecord({ ...IDENTITY_VALID, expires_at: -1 }), false);
+    assert.equal(isIdentityRecord({ ...IDENTITY_VALID, expires_at: 1.5 }), false);
+    assert.equal(isIdentityRecord(null), false);
   });
 });

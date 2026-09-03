@@ -29,6 +29,58 @@ export interface SanctionsDatasetEntry {
 /** All valid sanctions entry statuses. */
 export const SANCTIONS_STATUSES: readonly SanctionsStatus[] = ["active", "inactive"];
 
+/**
+ * Identity verification status, matching the on-chain `IdentityStatus`
+ * codes (safeguard_core::registries::identity). `verified` is the only
+ * status hooks may treat as verified; everything else fails closed.
+ */
+export type IdentityStatus = "verified" | "unverified" | "revoked" | "expired" | "unknown";
+
+/** All valid identity statuses. */
+export const IDENTITY_STATUSES: readonly IdentityStatus[] = [
+  "verified",
+  "unverified",
+  "revoked",
+  "expired",
+  "unknown",
+];
+
+/**
+ * One identity verification record, mirroring `set_identity` on-chain and
+ * `policies/fixtures/identity.json`. Attestation references only — no PII
+ * is stored on-chain.
+ */
+export interface IdentityRecord {
+  /** Stellar-style account address (G...). */
+  account: string;
+  status: IdentityStatus;
+  /** Reference to an off-chain attestation (KYC/verification provider). */
+  attestation_ref: string;
+  /** Unix epoch seconds when the verification expires; 0 = never. */
+  expires_at: number;
+}
+
+const G_ADDRESS = /^G[A-Z2-7]{55}$/;
+
+/** Structural check that a value is a well-formed identity record. */
+export function isIdentityRecord(value: unknown): value is IdentityRecord {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const record = value as Partial<IdentityRecord>;
+  return (
+    typeof record.account === "string" &&
+    G_ADDRESS.test(record.account) &&
+    typeof record.status === "string" &&
+    (IDENTITY_STATUSES as readonly string[]).includes(record.status) &&
+    typeof record.attestation_ref === "string" &&
+    record.attestation_ref.length > 0 &&
+    typeof record.expires_at === "number" &&
+    Number.isInteger(record.expires_at) &&
+    record.expires_at >= 0
+  );
+}
+
 const HEX_64 = /^[0-9a-fA-F]{64}$/;
 
 /** Decode a 64-hex-char subject hash into its 32 bytes (browser-safe). */
