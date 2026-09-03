@@ -1632,6 +1632,7 @@ dependencies = [
 name = "safeguard-contract"
 version = "0.1.0"
 dependencies = [
+ "proptest",
  "safeguard-core",
  "soroban-sdk",
 ]

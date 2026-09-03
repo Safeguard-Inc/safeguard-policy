@@ -583,3 +583,95 @@ fn jurisdiction_registry_is_authoritative_in_evaluate() {
         .unwrap_err();
     assert_eq!(err, contract_err(ContractError::InvalidRegistryData));
 }
+
+/// Arbitrary u32 input codes never panic or error: unknown codes decode
+/// fail-closed to `Unknown`, and unknown status/region codes never approve.
+/// The contract boundary is the last place junk codes could enter, so the
+/// whole u32 space is fuzzed (proptest samples it and shrinks failures).
+#[test]
+fn arbitrary_input_codes_never_error_or_fail_open() {
+    use proptest::prelude::*;
+
+    use safeguard_core::rules::account_status::AccountStatus as CoreStatus;
+    use safeguard_core::rules::jurisdiction::RegionStatus as CoreRegion;
+
+    let env = Env::default();
+    let (admin, _, _, token, policy, client) = setup(&env);
+    bound_and_active(&env, &client, &admin, &policy, &token);
+
+    // A second policy with a jurisdiction rule, bound to a second token, so
+    // the region decode path is exercised too.
+    let policy2 = rid(&env, "jurisdiction-only");
+    let token2 = Address::generate(&env);
+    let rules = vec![
+        &env,
+        RuleRecord {
+            rule_id: rid(&env, "JURISDICTION-001"),
+            rule_type: RuleType::Jurisdiction.to_code(),
+            action: RuleAction::Block.to_code(),
+        },
+    ];
+    client.register_version(&policy2, &1, &config_hash(&env, 4), &rules);
+    client.activate_version(&policy2, &1);
+    client.bind_token(&admin, &policy2, &token2);
+
+    let account = Address::generate(&env);
+    let subject = BytesN::from_array(&env, &[1; 32]);
+
+    proptest!(|(
+        status_code in any::<u32>(),
+        region_code in any::<u32>(),
+        allowlist_member in any::<bool>(),
+        denylist_matched in any::<bool>(),
+        sanctions_matched in any::<bool>(),
+    )| {
+        let input = EvaluationInput {
+            account_status: status_code,
+            allowlist_member,
+            denylist_matched,
+            sanctions_matched,
+            jurisdiction: region_code,
+            subject: subject.clone(),
+            account: account.clone(),
+        };
+
+        // Any code is decodable (fail-closed): evaluation must never error
+        // under either policy.
+        let result = client.try_evaluate(&policy, &token, &input);
+        prop_assert!(
+            result.is_ok(),
+            "evaluate errored on codes {} / {}",
+            status_code,
+            region_code
+        );
+        let regional = client.try_evaluate(&policy2, &token2, &input);
+        prop_assert!(regional.is_ok(), "jurisdiction policy errored on region code {}", region_code);
+
+        // An unrecognized account status maps to Unknown, which never approves.
+        if CoreStatus::from_code(status_code).is_none() {
+            let decision = result
+                .expect("invocation succeeded")
+                .expect("evaluation succeeded");
+            prop_assert_ne!(
+                decision.decision,
+                Decision::Approve.to_code(),
+                "unknown status code {} approved",
+                status_code
+            );
+        }
+
+        // An unrecognized region code maps to Unknown, and under the blocking
+        // jurisdiction policy Unknown triggers the rule action: never approve.
+        if CoreRegion::from_code(region_code).is_none() {
+            let decision = regional
+                .expect("invocation succeeded")
+                .expect("evaluation succeeded");
+            prop_assert_ne!(
+                decision.decision,
+                Decision::Approve.to_code(),
+                "unknown region code {} approved",
+                region_code
+            );
+        }
+    });
+}

@@ -25,4 +25,5 @@ soroban-sdk = { version = "27.0.6" }
 safeguard-core = { path = "../safeguard-core" }
 
 [dev-dependencies]
+proptest = "1"
 soroban-sdk = { version = "27.0.6", features = ["testutils"] }
