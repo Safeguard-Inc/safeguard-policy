@@ -161,7 +161,7 @@ identical decision. No network calls, no randomness, no hidden state.
 ├── sdk/typescript/           # TypeScript SDK (@safeguard/policy-sdk)
 ├── docs/                     # architecture, policy model, rule engine, security
 ├── scripts/                  # Off-chain validation tooling
-└── .github/workflows/        # CI
+└── .github/workflows/        # CI, security, release
 ```
 
 The two crates exist so the **policy engine is testable at native speed and
@@ -175,13 +175,14 @@ a thin on-chain shell** around it.
 rustup target add wasm32v1-none
 
 # The full local gate (same as CI): fmt, clippy, tests, wasm build,
-# schema battery, fixture checks, TypeScript SDK
+# schema battery, fixture checks, TypeScript SDK, dependency audit
 ./scripts/ci.sh
 
 # Or just one part
 ./scripts/ci.sh rust
 ./scripts/ci.sh schema
 ./scripts/ci.sh typescript
+./scripts/ci.sh security
 ```
 
 ## Using policies
@@ -219,6 +220,7 @@ cargo run -p safeguard-cli -- inspect policies/default/policy.json
 - [`docs/how-to-evaluate.md`](docs/how-to-evaluate.md) — a worked evaluation example
 - [`docs/sdk.md`](docs/sdk.md) — the Rust and TypeScript SDKs
 - [`docs/cli.md`](docs/cli.md) — the `safeguard` operator CLI
+- [`docs/release.md`](docs/release.md) — the release process and checklist
 - [`docs/decisions.md`](docs/decisions.md) — design decisions and rationale
 
 ## Roadmap
@@ -230,7 +232,7 @@ The build order follows the phases in [`docs/architecture.md`](docs/architecture
 3. **Evaluation** — deterministic APPROVE/BLOCK/FLAG engine ✅
 4. **Registries** — identity, sanctions, jurisdiction on-chain; `evaluate` resolves from them authoritatively ✅
 5. **Developer tooling** — Rust/TypeScript SDKs, CLI ✅
-6. **Hardening** — reference docs, CI, security model, proptest fuzzing, shipped-policy and golden compatibility gates ✅; cross-repo `safeguard-hooks` CI + testnet deployment pending
+6. **Hardening** — reference docs, CI, security model, proptest fuzzing, shipped-policy and golden compatibility gates, dependency supply-chain gate (cargo-deny + npm audit), and the release pipeline ✅; cross-repo `safeguard-hooks` CI + testnet deployment pending
 
 ## Contributing
 
