@@ -153,8 +153,11 @@ identical decision. No network calls, no randomness, no hidden state.
 │           ├── registry.rs   # Policy ↔ token bindings
 │           ├── evaluate.rs   # On-chain evaluation entrypoint
 │           └── test.rs       # Contract integration tests
+├── crates/safeguard-sdk/     # Off-chain Rust SDK (model, validation, evaluation)
+├── crates/safeguard-cli/     # `safeguard` operator CLI (offline)
 ├── policy-schema/            # JSON Schema: policy, rule, decision
 ├── policies/                 # default + example policies, test fixtures
+├── sdk/typescript/           # TypeScript SDK (@safeguard/policy-sdk)
 ├── docs/                     # architecture, policy model, rule engine, security
 ├── scripts/                  # Off-chain validation tooling
 └── .github/workflows/        # CI
@@ -184,8 +187,12 @@ rustup target add wasm32v1-none
 Reference policies live under [`policies/`](policies/):
 
 ```bash
-# Validate a policy document against the JSON Schema
+# Validate a policy document against the JSON Schema (Python, used in CI)
 python3 scripts/validate_policy.py policies/default/policy.json
+
+# Or with the operator CLI (same invariants, via the Rust SDK)
+cargo run -p safeguard-cli -- validate policies/default/policy.json
+cargo run -p safeguard-cli -- inspect policies/default/policy.json
 ```
 
 - [`policies/default/policy.json`](policies/default/policy.json) — the
@@ -208,6 +215,8 @@ python3 scripts/validate_policy.py policies/default/policy.json
 - [`docs/adapters.md`](docs/adapters.md) — the off-chain integration boundary
 - [`docs/integration.md`](docs/integration.md) — how hooks and audit consume this repo
 - [`docs/how-to-evaluate.md`](docs/how-to-evaluate.md) — a worked evaluation example
+- [`docs/sdk.md`](docs/sdk.md) — the Rust and TypeScript SDKs
+- [`docs/cli.md`](docs/cli.md) — the `safeguard` operator CLI
 - [`docs/decisions.md`](docs/decisions.md) — design decisions and rationale
 
 ## Roadmap
@@ -218,7 +227,7 @@ The build order follows the phases in [`docs/architecture.md`](docs/architecture
 2. **Core rules** — allowlist, denylist, sanctions, jurisdiction, account status ✅
 3. **Evaluation** — deterministic APPROVE/BLOCK/FLAG engine ✅
 4. **Registries** — identity, sanctions, jurisdiction, token scope (contract wiring)
-5. **Developer tooling** — Rust/TypeScript SDKs, CLI, fixture generation
+5. **Developer tooling** — Rust/TypeScript SDKs, CLI ✅
 6. **Hardening** — reference docs, CI, security model ✅; fuzzing, compatibility tests against `safeguard-hooks`, testnet deployment pending
 
 ## Contributing
