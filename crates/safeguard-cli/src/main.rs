@@ -39,6 +39,11 @@ enum Command {
         /// Path to a policy JSON document.
         path: PathBuf,
     },
+    /// Print a summary of a policy document.
+    Inspect {
+        /// Path to a policy JSON document.
+        path: PathBuf,
+    },
 }
 
 fn main() {
@@ -46,6 +51,7 @@ fn main() {
     let result = match cli.command {
         Command::Version => commands::version::run(),
         Command::Validate { path } => commands::validate::run(&path),
+        Command::Inspect { path } => commands::inspect::run(&path),
     };
     if let Err(error) = result {
         eprintln!("error: {error:#}");
