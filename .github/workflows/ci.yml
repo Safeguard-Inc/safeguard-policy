@@ -6,6 +6,22 @@ on:
   pull_request:
 
 jobs:
+  rust:
+    name: Rust gate (fmt, clippy, tests, wasm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Add Soroban wasm target
+        run: rustup target add wasm32v1-none
+
+      - name: Run the Rust gate
+        run: ./scripts/ci.sh rust
+
   schema:
     name: Policy schema & fixtures
     runs-on: ubuntu-latest
