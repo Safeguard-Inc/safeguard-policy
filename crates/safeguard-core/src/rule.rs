@@ -75,6 +75,137 @@ impl From<&str> for RuleId {
     }
 }
 
+/// The category of a compliance rule.
+///
+/// The engine evaluates enabled rules in fixed [`PRECEDENCE`] order: a rule
+/// of a later category only runs if every earlier category passed. Every
+/// category maps to a distinct registry/state source, which is what keeps the
+/// precedence unambiguous and testable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RuleType {
+    /// Membership in the allowlist is required (or sufficient) for operations.
+    Allowlist = 0,
+    /// Presence in the denylist prohibits operations.
+    Denylist = 1,
+    /// A sanctions-screening match triggers the rule action.
+    Sanctions = 2,
+    /// The subject's jurisdiction must be permitted for this token.
+    Jurisdiction = 3,
+}
+
+impl RuleType {
+    /// The stable numeric representation, used in on-chain serialization.
+    #[must_use]
+    pub const fn to_code(self) -> u32 {
+        self as u32
+    }
+
+    /// The stable lowercase label, used in JSON policy documents.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Allowlist => "allowlist",
+            Self::Denylist => "denylist",
+            Self::Sanctions => "sanctions",
+            Self::Jurisdiction => "jurisdiction",
+        }
+    }
+
+    /// Reconstruct a [`RuleType`] from its stable numeric code.
+    #[must_use]
+    pub fn from_code(code: u32) -> Option<Self> {
+        match code {
+            0 => Some(Self::Allowlist),
+            1 => Some(Self::Denylist),
+            2 => Some(Self::Sanctions),
+            3 => Some(Self::Jurisdiction),
+            _ => None,
+        }
+    }
+}
+
+/// What a rule does when its condition is met.
+///
+/// Policies choose per-rule severity: a sanctions match might `Block` under
+/// one policy and merely `Flag` for review under another.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RuleAction {
+    /// Deny the operation: the evaluation resolves to [`crate::decision::Decision::Block`].
+    Block = 0,
+    /// Require review: the evaluation resolves to [`crate::decision::Decision::Flag`].
+    Flag = 1,
+}
+
+impl RuleAction {
+    /// The stable numeric representation, used in on-chain serialization.
+    #[must_use]
+    pub const fn to_code(self) -> u32 {
+        self as u32
+    }
+
+    /// The stable lowercase label, used in JSON policy documents.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Block => "block",
+            Self::Flag => "flag",
+        }
+    }
+
+    /// Reconstruct a [`RuleAction`] from its stable numeric code.
+    #[must_use]
+    pub fn from_code(code: u32) -> Option<Self> {
+        match code {
+            0 => Some(Self::Block),
+            1 => Some(Self::Flag),
+            _ => None,
+        }
+    }
+}
+
+/// A named rule of a specific category with a configured action.
+///
+/// One policy version may enable at most one rule per [`RuleType`]; the
+/// contract rejects rule sets that duplicate a category so evaluation always
+/// maps unambiguously from category to rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rule {
+    /// Identifier, unique within a policy version, e.g. `"SANCTIONS-001"`.
+    pub id: RuleId,
+    /// The rule category.
+    pub rule_type: RuleType,
+    /// The action taken when the rule's condition is met.
+    pub action: RuleAction,
+}
+
+/// Fixed evaluation order across rule categories, documented in
+/// `docs/rule-engine.md` and enforced by the evaluator and its tests.
+///
+/// ```text
+/// Allowlist → Denylist → Sanctions → Jurisdiction
+/// ```
+///
+/// Account-status checks are structural and always run first (a frozen
+/// account is blocked regardless of what any rule says); see
+/// [`crate::evaluator`].
+pub const PRECEDENCE: [RuleType; 4] = [
+    RuleType::Allowlist,
+    RuleType::Denylist,
+    RuleType::Sanctions,
+    RuleType::Jurisdiction,
+];
+
+/// Rank of a rule category within [`PRECEDENCE`]: lower runs earlier.
+#[must_use]
+pub const fn precedence_rank(rule_type: RuleType) -> usize {
+    match rule_type {
+        RuleType::Allowlist => 0,
+        RuleType::Denylist => 1,
+        RuleType::Sanctions => 2,
+        RuleType::Jurisdiction => 3,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{RuleId, ID_LEN};
@@ -114,6 +245,83 @@ mod tests {
         assert_eq!(
             RuleId::from("ALLOWLIST-01"),
             RuleId::from_str("ALLOWLIST-01")
+        );
+    }
+}
+
+#[cfg(test)]
+mod rule_type_tests {
+    use super::{precedence_rank, PRECEDENCE};
+    use crate::rule::{Rule, RuleAction, RuleId, RuleType};
+
+    #[test]
+    fn rule_types_round_trip() {
+        for rule_type in [
+            RuleType::Allowlist,
+            RuleType::Denylist,
+            RuleType::Sanctions,
+            RuleType::Jurisdiction,
+        ] {
+            assert_eq!(RuleType::from_code(rule_type.to_code()), Some(rule_type));
+        }
+        assert_eq!(RuleType::from_code(99), None);
+    }
+
+    #[test]
+    fn rule_type_labels_are_stable() {
+        assert_eq!(RuleType::Allowlist.as_str(), "allowlist");
+        assert_eq!(RuleType::Denylist.as_str(), "denylist");
+        assert_eq!(RuleType::Sanctions.as_str(), "sanctions");
+        assert_eq!(RuleType::Jurisdiction.as_str(), "jurisdiction");
+    }
+
+    #[test]
+    fn rule_actions_round_trip() {
+        assert_eq!(RuleAction::from_code(0), Some(RuleAction::Block));
+        assert_eq!(RuleAction::from_code(1), Some(RuleAction::Flag));
+        assert_eq!(RuleAction::from_code(2), None);
+        assert_eq!(RuleAction::Block.as_str(), "block");
+        assert_eq!(RuleAction::Flag.as_str(), "flag");
+    }
+
+    #[test]
+    fn precedence_is_fixed_and_total() {
+        assert_eq!(
+            PRECEDENCE,
+            [
+                RuleType::Allowlist,
+                RuleType::Denylist,
+                RuleType::Sanctions,
+                RuleType::Jurisdiction,
+            ]
+        );
+        for (index, rule_type) in PRECEDENCE.iter().enumerate() {
+            assert_eq!(precedence_rank(*rule_type), index);
+        }
+    }
+
+    #[test]
+    fn rule_equality_compares_id_type_and_action() {
+        let rule = Rule {
+            id: RuleId::from_str("SANCTIONS-001"),
+            rule_type: RuleType::Sanctions,
+            action: RuleAction::Block,
+        };
+        let same = rule;
+        assert_eq!(rule, same);
+        assert_ne!(
+            rule,
+            Rule {
+                id: RuleId::from_str("SANCTIONS-002"),
+                ..rule
+            }
+        );
+        assert_ne!(
+            rule,
+            Rule {
+                action: RuleAction::Flag,
+                ..rule
+            }
         );
     }
 }
