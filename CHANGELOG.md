@@ -88,3 +88,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `isIdentityRecord`) mirroring the on-chain verification surface.
 - Schema battery extended to 39 checks with standalone sanctions-entry
   and decision-document positive/negative cases.
+- Adapter pipeline implementations in the new `crates/safeguard-adapters`
+  workspace member: sanctions source + normalizer (canonicalize-then-hash
+  subjects, deterministic list/status/date mapping, never-guess review
+  items), the identity provider boundary with a shared injected-clock
+  expiry rule, and jurisdiction universe classification with provider
+  alias normalization.
+- `safeguard dataset build` CLI command running a provider snapshot through
+  the adapter pipeline into a registry-ready dataset report, plus
+  `registry inspect` support for those reports (entries + review items).
+- A shipped sample snapshot (`policies/fixtures/snapshots/ofac-sample.txt`)
+  whose 5-entries + 1-review-item output is pinned by tests and the local
+  gate.
+- Testnet deployment runbooks: `scripts/deploy-testnet.sh` (deploy +
+  initialize + smoke, opt-in `--load-policy` deriving payloads from the
+  policy JSON) and `scripts/rehearse-upgrade.sh` (offline lifecycle gate
+  plus the on-chain register/activate/deactivate drill), documented in
+  `docs/deployment.md`.
+- TypeScript SDK `DatasetReport`/`ReviewItem` types mirroring the adapter
+  output shape, with structural validation.
+- Fixed: the local gate had lost its TypeScript gate in the security-batch
+  edit, silently breaking `./scripts/ci.sh all`; restored, and a new
+  `scripts` gate dry-runs the runbooks and rebuilds the sample dataset.
+- Docs: `adapters.md` and `cli.md` document the implemented pipeline;
+  roadmap, versioning and design-decisions records updated (D13-D15).
