@@ -778,13 +778,91 @@ fn shipped_combined_policy_enforces_the_documented_cases() {
         prohibited.reason_code,
         ReasonCode::JurisdictionProhibited.to_code()
     );
-    assert_eq!(prohibited.rule_id, Some(rid(&env, "JURISDICTION-001")));
-
-    // Case 6 — unknown region → fail-closed BLOCK.
+    assert_eq!(prohibited.rule_id, Some(rid(&env, "JURISDICTION-001"))); // Case 6 — unknown region → fail-closed BLOCK.
     let unknown = client.evaluate(&policy, &token, &input(0, true, false, false, 3));
     assert_eq!(unknown.decision, Decision::Block.to_code());
     assert_eq!(
         unknown.reason_code,
         ReasonCode::JurisdictionUnknown.to_code()
     );
+}
+
+/// The stable numeric surface `safeguard-hooks` consumes, pinned in one
+/// place: schema version, error codes, decision/reason/type/action codes and
+/// the registry status codes. Renumbering any of these silently breaks audit
+/// history and hook integrations, so each is asserted explicitly (see
+/// docs/versioning.md and docs/contract-interface.md).
+#[test]
+fn the_stable_numeric_interface_is_pinned() {
+    let env = Env::default();
+    let (_, _, _, _, _, client) = setup(&env);
+
+    // Schema version the contract speaks.
+    assert_eq!(client.schema_version(), 1);
+
+    // Contract error codes (docs/contract-interface.md table).
+    use crate::error::ContractError as E;
+    assert_eq!(E::Unauthorized as u32, 1);
+    assert_eq!(E::AlreadyInitialized as u32, 2);
+    assert_eq!(E::NotInitialized as u32, 3);
+    assert_eq!(E::PolicyNotFound as u32, 4);
+    assert_eq!(E::VersionNotFound as u32, 5);
+    assert_eq!(E::VersionNotDraft as u32, 6);
+    assert_eq!(E::InvalidRuleSet as u32, 7);
+    assert_eq!(E::PolicyNotActive as u32, 8);
+    assert_eq!(E::TokenNotBound as u32, 9);
+    assert_eq!(E::InvalidPolicyId as u32, 10);
+    assert_eq!(E::VersionExists as u32, 11);
+    assert_eq!(E::VersionNotActive as u32, 12);
+    assert_eq!(E::InvalidRegistryData as u32, 13);
+
+    // Core decision/reason/rule codes echoed into EvaluationResult and
+    // events (docs/rule-engine.md).
+    use safeguard_core::decision::{Decision as D, ReasonCode as R};
+    assert_eq!(D::Approve.to_code(), 0);
+    assert_eq!(D::Block.to_code(), 1);
+    assert_eq!(D::Flag.to_code(), 2);
+    assert_eq!(R::NoReason.to_code(), 0);
+    assert_eq!(R::AccountFrozen.to_code(), 1);
+    assert_eq!(R::AccountSuspended.to_code(), 2);
+    assert_eq!(R::AccountRestricted.to_code(), 3);
+    assert_eq!(R::AccountStatusUnknown.to_code(), 4);
+    assert_eq!(R::AllowlistRequired.to_code(), 5);
+    assert_eq!(R::DenylistMatch.to_code(), 6);
+    assert_eq!(R::SanctionsMatch.to_code(), 7);
+    assert_eq!(R::JurisdictionProhibited.to_code(), 8);
+    assert_eq!(R::JurisdictionRestricted.to_code(), 9);
+    assert_eq!(R::JurisdictionUnknown.to_code(), 10);
+
+    use safeguard_core::rule::{RuleAction as A, RuleType as T};
+    assert_eq!(T::Allowlist.to_code(), 0);
+    assert_eq!(T::Denylist.to_code(), 1);
+    assert_eq!(T::Sanctions.to_code(), 2);
+    assert_eq!(T::Jurisdiction.to_code(), 3);
+    assert_eq!(A::Block.to_code(), 0);
+    assert_eq!(A::Flag.to_code(), 1);
+
+    // Registry status codes written by the authorities and read by hooks.
+    use safeguard_core::registries::identity::IdentityStatus as I;
+    use safeguard_core::registries::sanctions::SanctionsStatus as S;
+    assert_eq!(I::Verified.to_code(), 0);
+    assert_eq!(I::Unverified.to_code(), 1);
+    assert_eq!(I::Revoked.to_code(), 2);
+    assert_eq!(I::Expired.to_code(), 3);
+    assert_eq!(I::Unknown.to_code(), 4);
+    assert_eq!(S::Active.to_code(), 0);
+    assert_eq!(S::Inactive.to_code(), 1);
+
+    // Account status and region codes entering EvaluationInput.
+    use safeguard_core::rules::account_status::AccountStatus as St;
+    use safeguard_core::rules::jurisdiction::RegionStatus as Rg;
+    assert_eq!(St::Active.to_code(), 0);
+    assert_eq!(St::Restricted.to_code(), 1);
+    assert_eq!(St::Frozen.to_code(), 2);
+    assert_eq!(St::Suspended.to_code(), 3);
+    assert_eq!(St::Unknown.to_code(), 4);
+    assert_eq!(Rg::Permitted.to_code(), 0);
+    assert_eq!(Rg::Restricted.to_code(), 1);
+    assert_eq!(Rg::Prohibited.to_code(), 2);
+    assert_eq!(Rg::Unknown.to_code(), 3);
 }
