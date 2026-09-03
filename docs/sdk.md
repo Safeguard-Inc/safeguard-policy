@@ -65,6 +65,8 @@ the Soroban runtime.
 
 ## TypeScript SDK (`@safeguard/policy-sdk`)
 
+Package documentation: [`sdk/typescript/README.md`](../sdk/typescript/README.md).
+
 ### Surface
 
 - `types.ts` — literal unions mirroring the JSON Schema enums exactly
