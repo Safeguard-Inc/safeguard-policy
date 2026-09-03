@@ -47,3 +47,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the npm ecosystem.
 - `docs/sdk.md` and `docs/cli.md`: reference documentation for the SDKs and
   the operator CLI.
+- On-chain compliance registries in `safeguard-contract` (identity
+  verification, normalized sanctions entries keyed by subject hash,
+  jurisdiction classification) with role-authenticated entrypoints, typed
+  events for audit, and `evaluate` resolving sanctions/jurisdiction facts
+  authoritatively from registry entries with a caller-claim fallback.
+- Property testing with proptest (dev-only): engine invariants over
+  arbitrary rule sets, arbitrary facts against every shipped policy, and
+  arbitrary u32 codes at the contract input boundary — determinism and
+  fail-closed guarantees with shrinking counterexamples.
+- Compatibility surface for `safeguard-hooks`: the shipped combined policy
+  registered on-chain and asserted against the documented cases, a single
+  test pinning every stable numeric code, and golden decision documents for
+  the worked cases committed under `crates/safeguard-sdk/tests/fixtures/`.
+- Registry dataset models in both SDKs mirroring `sanctions.schema.json`
+  (Rust `registry` module; TypeScript `registry.ts`).
+- Reference docs updated for the registry layer and the compatibility
+  gates (`registries.md`, `contract-interface.md`, `integration.md`,
+  `how-to-evaluate.md`).
