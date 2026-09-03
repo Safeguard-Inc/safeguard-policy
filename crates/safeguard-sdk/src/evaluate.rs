@@ -15,6 +15,72 @@ use safeguard_core::evaluation::{
     EvaluationRequest, JurisdictionCheck, MatchCheck, MembershipCheck,
 };
 
+/// A facts **file** as documented for the CLI and fixture tooling.
+///
+/// Labels mirror the JSON surfaces (`docs/cli.md`): account status and
+/// region use the stable core labels (plus region **codes** like `US`),
+/// membership/matches are booleans. Strict `deny_unknown_fields` posture
+/// matches the JSON schemas.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FactsFile {
+    /// `active` | `restricted` | `frozen` | `suspended` | `unknown`.
+    pub account_status: String,
+    pub allowlist_member: bool,
+    pub denylist_matched: bool,
+    pub sanctions_matched: bool,
+    /// A region code (e.g. `US`) or a classification
+    /// (`permitted` | `restricted` | `prohibited` | `unknown`).
+    pub jurisdiction: String,
+}
+
+/// Parse an [`AccountStatus`] from its stable lowercase label.
+pub fn parse_status_label(label: &str) -> Result<AccountStatus, String> {
+    match label {
+        "active" => Ok(AccountStatus::Active),
+        "restricted" => Ok(AccountStatus::Restricted),
+        "frozen" => Ok(AccountStatus::Frozen),
+        "suspended" => Ok(AccountStatus::Suspended),
+        "unknown" => Ok(AccountStatus::Unknown),
+        _ => Err(format!(
+            "unknown account_status {label:?} (use active|restricted|frozen|suspended|unknown)"
+        )),
+    }
+}
+
+/// Parse a [`RegionStatus`] from its stable lowercase classification label.
+#[must_use]
+pub fn parse_region_label(label: &str) -> Option<RegionStatus> {
+    match label {
+        "permitted" => Some(RegionStatus::Permitted),
+        "restricted" => Some(RegionStatus::Restricted),
+        "prohibited" => Some(RegionStatus::Prohibited),
+        "unknown" => Some(RegionStatus::Unknown),
+        _ => None,
+    }
+}
+
+impl FactsFile {
+    /// Resolve this facts file against a policy into [`EvaluationFacts`].
+    ///
+    /// The region field is an explicit classification when it parses as one,
+    /// otherwise it is a region code classified against the policy's
+    /// jurisdiction rule (unknown codes classify as `Unknown`, fail-closed).
+    pub fn to_evaluation_facts(&self, policy: &PolicyDocument) -> Result<EvaluationFacts, String> {
+        let jurisdiction = match parse_region_label(&self.jurisdiction) {
+            Some(classification) => classification,
+            None => classify_region(policy, &self.jurisdiction),
+        };
+        Ok(EvaluationFacts {
+            account_status: parse_status_label(&self.account_status)?,
+            allowlist_member: self.allowlist_member,
+            denylist_matched: self.denylist_matched,
+            sanctions_matched: self.sanctions_matched,
+            jurisdiction,
+        })
+    }
+}
+
 /// The subject facts an evaluation needs, resolved by the caller.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EvaluationFacts {
@@ -284,5 +350,61 @@ mod tests {
             RuleActionLabel::Flag,
         ));
         assert!(try_evaluate(&broken, &EvaluationFacts::default()).is_err());
+    }
+
+    #[test]
+    fn facts_file_resolves_labels_and_region_codes() {
+        let policy = policy();
+        let json = r#"{
+            "account_status": "active",
+            "allowlist_member": true,
+            "denylist_matched": false,
+            "sanctions_matched": false,
+            "jurisdiction": "US"
+        }"#;
+        let facts: FactsFile = serde_json::from_str(json).expect("parses");
+        let resolved = facts.to_evaluation_facts(&policy).expect("resolves");
+        assert_eq!(resolved.account_status, AccountStatus::Active);
+        assert_eq!(resolved.jurisdiction, RegionStatus::Permitted);
+
+        // An explicit classification wins over code classification.
+        let classified = serde_json::from_str::<FactsFile>(
+            r#"{
+                "account_status": "active",
+                "allowlist_member": true,
+                "denylist_matched": false,
+                "sanctions_matched": false,
+                "jurisdiction": "prohibited"
+            }"#,
+        )
+        .expect("parses");
+        let resolved = classified.to_evaluation_facts(&policy).expect("resolves");
+        assert_eq!(resolved.jurisdiction, RegionStatus::Prohibited);
+
+        // Unknown labels are rejected, unknown region codes fail closed.
+        let bad = serde_json::from_str::<FactsFile>(
+            r#"{
+                "account_status": "bogus",
+                "allowlist_member": true,
+                "denylist_matched": false,
+                "sanctions_matched": false,
+                "jurisdiction": "US"
+            }"#,
+        )
+        .expect("parses");
+        assert!(bad.to_evaluation_facts(&policy).is_err());
+
+        // Unknown fields are rejected like the schemas.
+        assert!(serde_json::from_str::<FactsFile>(
+            r#"{
+                "account_status": "active",
+                "allowlist_member": true,
+                "denylist_matched": false,
+                "sanctions_matched": false,
+                "jurisdiction": "US",
+                "extra": true
+            }"#
+        )
+        .is_err());
     }
 }

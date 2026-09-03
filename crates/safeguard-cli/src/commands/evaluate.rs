@@ -6,49 +6,10 @@ use std::path::Path;
 
 use anyhow::{bail, Context, Result};
 use safeguard_sdk::model::PolicyDocument;
-use safeguard_sdk::{AccountStatus, RegionStatus};
-use serde::Deserialize;
+use safeguard_sdk::FactsFile;
 
-/// Facts file shape: core labels plus a region code or classification.
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FactsFile {
-    /// `active` | `restricted` | `frozen` | `suspended` | `unknown`.
-    account_status: String,
-    allowlist_member: bool,
-    denylist_matched: bool,
-    sanctions_matched: bool,
-    /// A region code (e.g. "US") or a classification
-    /// (`permitted` | `restricted` | `prohibited` | `unknown`).
-    jurisdiction: String,
-}
-
-fn parse_status(label: &str) -> Result<AccountStatus> {
-    let status = match label {
-        "active" => AccountStatus::Active,
-        "restricted" => AccountStatus::Restricted,
-        "frozen" => AccountStatus::Frozen,
-        "suspended" => AccountStatus::Suspended,
-        "unknown" => AccountStatus::Unknown,
-        _ => bail!(
-            "unknown account_status {label:?} (use active|restricted|frozen|suspended|unknown)"
-        ),
-    };
-    Ok(status)
-}
-
-fn parse_classification(label: &str) -> Option<RegionStatus> {
-    match label {
-        "permitted" => Some(RegionStatus::Permitted),
-        "restricted" => Some(RegionStatus::Restricted),
-        "prohibited" => Some(RegionStatus::Prohibited),
-        "unknown" => Some(RegionStatus::Unknown),
-        _ => None,
-    }
-}
-
-/// Evaluate a subject offline. `jurisdiction` in the facts file is a region
-/// code (classified against the policy) or an explicit classification.
+/// Evaluate a subject offline. The facts file shape is the SDK's
+/// [`FactsFile`] (see `docs/cli.md`).
 pub fn run(policy_path: &Path, facts_path: &Path) -> Result<()> {
     let policy: PolicyDocument = serde_json::from_str(
         &fs::read_to_string(policy_path)
@@ -62,8 +23,6 @@ pub fn run(policy_path: &Path, facts_path: &Path) -> Result<()> {
     )
     .with_context(|| format!("parsing {}", facts_path.display()))?;
 
-    let account_status = parse_status(&facts.account_status)?;
-
     // Validate before deciding: the SDK refuses to evaluate invalid docs.
     let problems = safeguard_sdk::validation::validate_policy_document(&policy);
     if !problems.is_empty() {
@@ -74,21 +33,10 @@ pub fn run(policy_path: &Path, facts_path: &Path) -> Result<()> {
         bail!("refusing to evaluate an invalid policy document");
     }
 
-    let jurisdiction = match parse_classification(&facts.jurisdiction) {
-        Some(classification) => classification,
-        None => safeguard_sdk::evaluate::classify_region(&policy, &facts.jurisdiction),
-    };
-
-    let decision = safeguard_sdk::evaluate::evaluate(
-        &policy,
-        &safeguard_sdk::EvaluationFacts {
-            account_status,
-            allowlist_member: facts.allowlist_member,
-            denylist_matched: facts.denylist_matched,
-            sanctions_matched: facts.sanctions_matched,
-            jurisdiction,
-        },
-    );
+    let evaluation_facts = facts
+        .to_evaluation_facts(&policy)
+        .map_err(|message| anyhow::anyhow!("resolving {}: {message}", facts_path.display()))?;
+    let decision = safeguard_sdk::evaluate::evaluate(&policy, &evaluation_facts);
 
     let rule = decision
         .rule
