@@ -46,3 +46,24 @@ jobs:
           python3 scripts/validate_policy.py
           policies/default/policy.json
           policies/examples/*.json
+
+  typescript:
+    name: TypeScript SDK (typecheck, tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk/typescript
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: sdk/typescript/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck, build and run tests
+        run: npm test

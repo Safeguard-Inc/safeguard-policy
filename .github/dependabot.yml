@@ -14,3 +14,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+
+  # TypeScript SDK.
+  - package-ecosystem: npm
+    directory: "/sdk/typescript"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
