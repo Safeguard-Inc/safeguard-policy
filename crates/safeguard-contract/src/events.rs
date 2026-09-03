@@ -8,7 +8,7 @@
 //! Note the boundary: **transfer-level** events (`transfer_approved`,
 //! `transfer_blocked`) belong to `safeguard-hooks`, not here.
 
-use soroban_sdk::contractevent;
+use soroban_sdk::{contractevent, Address, Env};
 
 use crate::storage::Id;
 
@@ -38,4 +38,44 @@ pub struct PolicyDeactivated {
     #[topic]
     pub policy_id: Id,
     pub version: u32,
+}
+
+/// An account's identity verification record was written or replaced.
+///
+/// Part of the `registry_updated` event family: audit consumes these to
+/// prove compliance data changes. `status` is an
+/// [`safeguard_core::registries::identity::IdentityStatus`] code.
+#[contractevent]
+pub struct IdentityUpdated {
+    #[topic]
+    pub account: Address,
+    pub status: u32,
+    pub attestation_ref: Id,
+    pub expires_at: u64,
+}
+
+/// An account's identity verification record was removed.
+#[contractevent]
+pub struct IdentityRemoved {
+    #[topic]
+    pub account: Address,
+}
+
+/// Publish an identity record write/replacement.
+pub fn identity_updated(env: &Env, account: &Address, record: &crate::storage::IdentityRecord) {
+    IdentityUpdated {
+        account: account.clone(),
+        status: record.status,
+        attestation_ref: record.attestation_ref.clone(),
+        expires_at: record.expires_at,
+    }
+    .publish(env);
+}
+
+/// Publish an identity record removal.
+pub fn identity_removed(env: &Env, account: &Address) {
+    IdentityRemoved {
+        account: account.clone(),
+    }
+    .publish(env);
 }

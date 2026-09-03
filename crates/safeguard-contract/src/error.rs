@@ -35,4 +35,6 @@ pub enum ContractError {
     VersionExists = 11,
     /// The version exists but is not the active version.
     VersionNotActive = 12,
+    /// Registry data carries an unknown status/region code.
+    InvalidRegistryData = 13,
 }

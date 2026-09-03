@@ -44,6 +44,7 @@ mod error;
 mod evaluate;
 mod events;
 mod lifecycle;
+mod registries;
 mod registry;
 mod storage;
 

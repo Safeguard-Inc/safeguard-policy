@@ -18,8 +18,9 @@ use crate::admin;
 use crate::error::ContractError;
 use crate::evaluate::{self, EvaluationInput, EvaluationResult};
 use crate::lifecycle;
+use crate::registries::identity;
 use crate::registry;
-use crate::storage::{Id, PolicyVersionRecord, RuleRecord};
+use crate::storage::{Id, IdentityRecord, PolicyVersionRecord, RuleRecord};
 
 #[contract]
 pub struct PolicyContract;
@@ -133,6 +134,43 @@ impl PolicyContract {
     /// The tokens bound to a policy (public read).
     pub fn bound_tokens(env: Env, policy_id: Id) -> Vec<Address> {
         registry::bound_tokens(&env, &policy_id)
+    }
+
+    // ------------------------------------------------------------ registries
+
+    /// Write (or replace) an account's identity verification record.
+    /// Admin or registry authority.
+    pub fn set_identity(
+        env: Env,
+        operator: Address,
+        account: Address,
+        status: u32,
+        attestation_ref: Id,
+        expires_at: u64,
+    ) -> Result<(), ContractError> {
+        identity::set_identity(
+            &env,
+            &operator,
+            &account,
+            status,
+            attestation_ref,
+            expires_at,
+        )
+    }
+
+    /// Remove an account's identity verification record.
+    /// Admin or registry authority.
+    pub fn remove_identity(
+        env: Env,
+        operator: Address,
+        account: Address,
+    ) -> Result<(), ContractError> {
+        identity::remove_identity(&env, &operator, &account)
+    }
+
+    /// An account's identity verification record (public read).
+    pub fn identity(env: Env, account: Address) -> Option<IdentityRecord> {
+        identity::identity(&env, &account)
     }
 
     // ------------------------------------------------------------ evaluation
