@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://safeguard.dev/schemas/jurisdiction.schema.json?version=1",
+  "title": "Safeguard Jurisdiction Rule Configuration",
+  "description": "Configuration of a jurisdiction rule: the region classification for a token and the action taken when a subject's region is restricted, prohibited or unknown. This is the object carried by a policy rule of type \"jurisdiction\" (see policy.schema.json) and also validated standalone by adapters and CLIs.",
+  "type": "object",
+  "required": ["action", "regions"],
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "enum": ["block", "flag"],
+      "description": "What the rule does for a non-permitted region. Unknown regions fail closed and trigger the same action (never silently approve)."
+    },
+    "regions": { "$ref": "#/$defs/region_lists" }
+  },
+  "$defs": {
+    "region_code": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$",
+      "description": "ISO 3166-1 alpha-2 region code, uppercase."
+    },
+    "region_lists": {
+      "type": "object",
+      "required": ["permitted", "restricted", "prohibited"],
+      "additionalProperties": false,
+      "properties": {
+        "permitted": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/region_code" },
+          "description": "Regions that may hold and transact the token."
+        },
+        "restricted": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/region_code" },
+          "description": "Regions that need review; trigger the rule action."
+        },
+        "prohibited": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/region_code" },
+          "description": "Regions that may not transact; trigger the rule action."
+        }
+      }
+    }
+  }
+}
