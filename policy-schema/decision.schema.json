@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://safeguard.dev/schemas/decision.schema.json?version=1",
+  "title": "Safeguard Policy Decision",
+  "description": "A policy decision document produced when a policy is evaluated. Emitted by safeguard-hooks and consumed by safeguard-audit; the labels mirror safeguard_core::decision exactly.",
+  "type": "object",
+  "required": ["decision", "policy_id", "policy_version", "reason_code"],
+  "additionalProperties": false,
+  "properties": {
+    "decision": {
+      "enum": ["APPROVE", "BLOCK", "FLAG"],
+      "description": "The outcome; maps to safeguard_core::decision::Decision labels."
+    },
+    "policy_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[ -~]*$",
+      "description": "The policy evaluated (ASCII, at most 32 bytes)."
+    },
+    "policy_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The active version that produced this decision."
+    },
+    "rule_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[ -~]*$",
+      "description": "The rule that triggered the outcome, when a rule produced it. Absent for structural outcomes (e.g. account status) and for approvals."
+    },
+    "reason_code": {
+      "enum": [
+        "no_reason",
+        "account_frozen",
+        "account_suspended",
+        "account_restricted",
+        "account_status_unknown",
+        "allowlist_required",
+        "denylist_match",
+        "sanctions_match",
+        "jurisdiction_prohibited",
+        "jurisdiction_restricted",
+        "jurisdiction_unknown"
+      ],
+      "description": "Stable machine-readable cause; maps to safeguard_core::decision::ReasonCode labels."
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$",
+      "description": "RFC 3339 timestamp recorded by the emitting service."
+    }
+  }
+}
