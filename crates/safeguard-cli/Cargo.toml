@@ -13,6 +13,7 @@ categories = ["cryptography::cryptocurrencies"]
 workspace = true
 
 [dependencies]
+safeguard-adapters = { path = "../safeguard-adapters", version = "0.1.0" }
 safeguard-sdk = { path = "../safeguard-sdk", version = "0.1.0" }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }

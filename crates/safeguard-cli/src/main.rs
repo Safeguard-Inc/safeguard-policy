@@ -67,6 +67,17 @@ enum Command {
         #[command(subcommand)]
         command: PolicyCommand,
     },
+    /// Run a provider snapshot through an adapter pipeline.
+    Dataset {
+        #[command(subcommand)]
+        command: DatasetCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum DatasetCommand {
+    /// Normalize a sanctions snapshot into a dataset report.
+    Build(commands::dataset::DatasetArgs),
 }
 
 #[derive(Subcommand)]
@@ -123,6 +134,9 @@ fn main() {
                     strict,
                 },
         } => commands::policy::run(&policy, &fixtures_dir, strict),
+        Command::Dataset {
+            command: DatasetCommand::Build(args),
+        } => commands::dataset::run(args),
     };
     if let Err(error) = result {
         eprintln!("error: {error:#}");

@@ -41,6 +41,12 @@ const UNKNOWN_FIELD_POLICY: &str = r#"{
   "unexpected": true
 }"#;
 
+const SNAPSHOT: &str = "\
+bin laden, usama|SDN|active|2023-06-01
+qods force|SSI|active|2021-04-15
+unmapped entity|XYZ|active|2023-01-01
+";
+
 /// Write `content` to a unique temp file and return its path.
 fn temp_file(name: &str, content: &str) -> PathBuf {
     let dir =
@@ -338,6 +344,29 @@ fn registry_inspect_summarizes_each_dataset_kind() {
     assert!(ok);
     assert!(stdout.contains("token registry"));
     assert!(stdout.contains("institutional-default"));
+}
+
+#[test]
+fn dataset_build_normalizes_a_snapshot_and_reports_review_items() {
+    let snapshot = temp_file("snapshot.txt", SNAPSHOT);
+    let report = temp_file("report.json", "");
+    let (ok, stdout, stderr) = run(&[
+        "dataset",
+        "build",
+        snapshot.to_str().unwrap(),
+        "-o",
+        report.to_str().unwrap(),
+    ]);
+    assert!(ok, "dataset build must succeed: {stderr}");
+    assert!(stdout.contains("2 entries normalized"));
+    assert!(stdout.contains("1 review items"));
+    assert!(stdout.contains("unmapped provider list code"));
+
+    let written = fs::read_to_string(&report).expect("report written");
+    let value: serde_json::Value = serde_json::from_str(&written).expect("report is JSON");
+    assert_eq!(value["source"], "ofac");
+    assert_eq!(value["entries"].as_array().expect("entries array").len(), 2);
+    assert_eq!(value["review"].as_array().expect("review array").len(), 1);
 }
 
 #[test]

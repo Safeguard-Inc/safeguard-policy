@@ -1,5 +1,6 @@
 //! CLI subcommand implementations.
 
+pub mod dataset;
 pub mod evaluate;
 pub mod fixture;
 pub mod inspect;
