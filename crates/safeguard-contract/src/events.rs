@@ -196,6 +196,26 @@ pub struct AuthorityRemoved {
     pub authority: Address,
 }
 
+/// An address was added to the policy-authority set (may activate and
+/// deactivate policy versions).
+///
+/// The spec's role model separates *creating* versions (admin) from
+/// *activating* them (policy authority); like the registry-authority events,
+/// role changes are published so audit can prove who could transition the
+/// active policy version at any point in time.
+#[contractevent]
+pub struct PolicyAuthorityAdded {
+    #[topic]
+    pub authority: Address,
+}
+
+/// An address was removed from the policy-authority set.
+#[contractevent]
+pub struct PolicyAuthorityRemoved {
+    #[topic]
+    pub authority: Address,
+}
+
 /// Publish a registry-authority addition.
 pub fn authority_added(env: &Env, authority: &Address) {
     AuthorityAdded {
@@ -207,6 +227,22 @@ pub fn authority_added(env: &Env, authority: &Address) {
 /// Publish a registry-authority removal.
 pub fn authority_removed(env: &Env, authority: &Address) {
     AuthorityRemoved {
+        authority: authority.clone(),
+    }
+    .publish(env);
+}
+
+/// Publish a policy-authority addition.
+pub fn policy_authority_added(env: &Env, authority: &Address) {
+    PolicyAuthorityAdded {
+        authority: authority.clone(),
+    }
+    .publish(env);
+}
+
+/// Publish a policy-authority removal.
+pub fn policy_authority_removed(env: &Env, authority: &Address) {
+    PolicyAuthorityRemoved {
         authority: authority.clone(),
     }
     .publish(env);
