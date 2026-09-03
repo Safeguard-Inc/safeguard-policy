@@ -10,10 +10,11 @@
 //!    └───deactivate───────┘──────────────▶ Disabled
 //! ```
 //!
-//! Registration and lifecycle transitions require the admin's auth (policy
-//! authority). Lifecycle events are published for `safeguard-audit`.
+//! Registration requires the admin's auth; activating and deactivating
+//! require the admin or a policy authority (the spec's Policy Admin / Policy
+//! Authority split). Lifecycle events are published for `safeguard-audit`.
 
-use soroban_sdk::{Env, Vec};
+use soroban_sdk::{Address, Env, Vec};
 
 use crate::admin;
 use crate::error::ContractError;
@@ -83,9 +84,14 @@ pub fn register_version(
 }
 
 /// Activate a draft version, superseding any currently active version.
-/// Admin only.
-pub fn activate_version(env: &Env, policy_id: &Id, version: u32) -> Result<(), ContractError> {
-    admin::require_admin(env)?;
+/// Admin or policy authority.
+pub fn activate_version(
+    env: &Env,
+    operator: &Address,
+    policy_id: &Id,
+    version: u32,
+) -> Result<(), ContractError> {
+    admin::require_admin_or_policy_authority(env, operator)?;
 
     let mut record =
         storage::version_record(env, policy_id, version).ok_or(ContractError::VersionNotFound)?;
@@ -117,9 +123,14 @@ pub fn activate_version(env: &Env, policy_id: &Id, version: u32) -> Result<(), C
 }
 
 /// Deactivate a version (only the currently active one may be deactivated).
-/// Admin only.
-pub fn deactivate_version(env: &Env, policy_id: &Id, version: u32) -> Result<(), ContractError> {
-    admin::require_admin(env)?;
+/// Admin or policy authority.
+pub fn deactivate_version(
+    env: &Env,
+    operator: &Address,
+    policy_id: &Id,
+    version: u32,
+) -> Result<(), ContractError> {
+    admin::require_admin_or_policy_authority(env, operator)?;
 
     let mut record =
         storage::version_record(env, policy_id, version).ok_or(ContractError::VersionNotFound)?;
