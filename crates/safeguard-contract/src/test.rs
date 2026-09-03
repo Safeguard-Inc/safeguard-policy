@@ -20,6 +20,7 @@ use soroban_sdk::{vec, Address, Bytes, BytesN, Env, Vec};
 
 use safeguard_core::decision::{Decision, ReasonCode};
 use safeguard_core::rule::{RuleAction, RuleId, RuleType};
+use safeguard_core::rules::account_status::AccountStatus;
 use safeguard_core::version::VersionStatus;
 
 /// Encode an id from an ASCII string using the core id rules.
@@ -642,6 +643,98 @@ fn identity_registry_lifecycle_and_events() {
         .try_set_identity(&stranger, &account, &0, &rid(&env, "ATT-1"), &0)
         .unwrap_err();
     assert_eq!(err, contract_err(ContractError::Unauthorized));
+}
+
+/// §18 negative: an account with no identity record is genuinely unknown —
+/// the registry reads `None` (no implicit "verified" entry), evaluation with
+/// an unknown status fails closed to FLAG, and no unauthorised party can
+/// conjure a record for it.
+#[test]
+fn unknown_account_has_no_record_and_fails_closed() {
+    let env = Env::default();
+    let (admin, authority, _, token, policy, client) = setup(&env);
+    bound_and_active(&env, &client, &admin, &policy, &token);
+
+    let stranger = Address::generate(&env);
+
+    // No record: the account is unknown, never implicitly verified.
+    assert!(client.identity(&stranger).is_none());
+
+    // Evaluating with the unknown status flags rather than approves.
+    let mut facts = active_input(&env, &stranger);
+    facts.account_status = AccountStatus::Unknown.to_code();
+    let result = client.evaluate(&policy, &token, &facts);
+    assert_eq!(result.decision, Decision::Flag.to_code());
+    assert_eq!(
+        result.reason_code,
+        ReasonCode::AccountStatusUnknown.to_code()
+    );
+
+    // A stranger cannot write a record for the unknown account either.
+    let err = client
+        .try_set_identity(&stranger, &stranger, &0, &rid(&env, "ATT-1"), &0)
+        .unwrap_err();
+    assert_eq!(err, contract_err(ContractError::Unauthorized));
+
+    // Even a registry authority writing an *expired* record cannot make the
+    // account active: evaluation never consults wall-clock time, so the
+    // expired record stays a data fact — audit can prove expiry, evaluation
+    // still fails closed on the caller's resolved status.
+    client.set_identity(
+        &authority,
+        &stranger,
+        &0, // verified at write time
+        &rid(&env, "ATT-1"),
+        &1, // already expired (epoch 1)
+    );
+    let record = client.identity(&stranger).unwrap();
+    assert_eq!(record.status, 0);
+    assert_eq!(record.expires_at, 1);
+    assert_eq!(result.decision, Decision::Flag.to_code());
+}
+
+/// §18 negative: an expired attestation is stored exactly as written (never
+/// silently extended or rewritten) so audit can prove it expired, and only an
+/// authorised registry authority can replace it.
+#[test]
+fn expired_attestation_is_stored_unmutated_and_requires_authority_to_replace() {
+    let env = Env::default();
+    let (admin, authority, _, _, _, client) = setup(&env);
+    let account = Address::generate(&env);
+
+    // Write an already-expired attestation (epoch 1) with a revocation-era
+    // reference; the contract must store it byte-for-byte.
+    client.set_identity(&authority, &account, &0, &rid(&env, "ATT-EXPIRED"), &1);
+    let record = client.identity(&account).unwrap();
+    assert_eq!(record.status, 0);
+    assert_eq!(record.attestation_ref, rid(&env, "ATT-EXPIRED"));
+    assert_eq!(record.expires_at, 1, "expiry must not be mutated on store");
+
+    // The admin may replace it (bootstrap path), but a stranger cannot — an
+    // expired record cannot be silently refreshed by just anyone.
+    let err = client
+        .try_set_identity(
+            &Address::generate(&env),
+            &account,
+            &0,
+            &rid(&env, "ATT-REPLACED"),
+            &9_999_999_999,
+        )
+        .unwrap_err();
+    assert_eq!(err, contract_err(ContractError::Unauthorized));
+
+    client.set_identity(
+        &admin,
+        &account,
+        &0,
+        &rid(&env, "ATT-REPLACED"),
+        &9_999_999_999,
+    );
+    assert_eq!(
+        client.identity(&account).unwrap().attestation_ref,
+        rid(&env, "ATT-REPLACED")
+    );
+    assert_eq!(client.identity(&account).unwrap().expires_at, 9_999_999_999);
 }
 
 /// Role mutations publish AuthorityAdded/AuthorityRemoved events — and only
