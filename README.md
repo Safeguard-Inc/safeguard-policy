@@ -154,13 +154,14 @@ identical decision. No network calls, no randomness, no hidden state.
 │           ├── registries/   # identity, sanctions, jurisdiction registries
 │           ├── evaluate.rs   # On-chain evaluation entrypoint
 │           └── test.rs       # Contract integration tests
+├── crates/safeguard-adapters/ # Off-chain adapters (sanctions/identity/jurisdiction)
 ├── crates/safeguard-sdk/     # Off-chain Rust SDK (model, validation, evaluation)
 ├── crates/safeguard-cli/     # `safeguard` operator CLI (offline)
 ├── policy-schema/            # JSON Schema: policy, rule, decision
 ├── policies/                 # default + example policies, test fixtures
 ├── sdk/typescript/           # TypeScript SDK (@safeguard/policy-sdk)
 ├── docs/                     # architecture, policy model, rule engine, security
-├── scripts/                  # Off-chain validation tooling
+├── scripts/                  # Validation tooling + deploy/rehearse runbooks
 └── .github/workflows/        # CI, security, release
 ```
 
@@ -175,7 +176,8 @@ a thin on-chain shell** around it.
 rustup target add wasm32v1-none
 
 # The full local gate (same as CI): fmt, clippy, tests, wasm build,
-# schema battery, fixture checks, TypeScript SDK, dependency audit
+# schema battery, fixture checks, TypeScript SDK, dependency audit,
+# runbook dry-runs
 ./scripts/ci.sh
 
 # Or just one part
@@ -183,6 +185,7 @@ rustup target add wasm32v1-none
 ./scripts/ci.sh schema
 ./scripts/ci.sh typescript
 ./scripts/ci.sh security
+./scripts/ci.sh scripts
 ```
 
 ## Using policies
@@ -196,6 +199,11 @@ python3 scripts/validate_policy.py policies/default/policy.json
 # Or with the operator CLI (same invariants, via the Rust SDK)
 cargo run -p safeguard-cli -- validate policies/default/policy.json
 cargo run -p safeguard-cli -- inspect policies/default/policy.json
+
+# Normalize a sanctions provider snapshot into a registry dataset report
+cargo run -p safeguard-cli -- dataset build \
+  policies/fixtures/snapshots/ofac-sample.txt -o report.json
+cargo run -p safeguard-cli -- registry inspect report.json
 ```
 
 - [`policies/default/policy.json`](policies/default/policy.json) — the
@@ -221,6 +229,7 @@ cargo run -p safeguard-cli -- inspect policies/default/policy.json
 - [`docs/sdk.md`](docs/sdk.md) — the Rust and TypeScript SDKs
 - [`docs/cli.md`](docs/cli.md) — the `safeguard` operator CLI
 - [`docs/release.md`](docs/release.md) — the release process and checklist
+- [`docs/deployment.md`](docs/deployment.md) — testnet deploy and upgrade drills
 - [`docs/decisions.md`](docs/decisions.md) — design decisions and rationale
 
 ## Roadmap
@@ -232,7 +241,10 @@ The build order follows the phases in [`docs/architecture.md`](docs/architecture
 3. **Evaluation** — deterministic APPROVE/BLOCK/FLAG engine ✅
 4. **Registries** — identity, sanctions, jurisdiction on-chain; `evaluate` resolves from them authoritatively ✅
 5. **Developer tooling** — Rust/TypeScript SDKs, CLI ✅
-6. **Hardening** — reference docs, CI, security model, proptest fuzzing, shipped-policy and golden compatibility gates, dependency supply-chain gate (cargo-deny + npm audit), and the release pipeline ✅; cross-repo `safeguard-hooks` CI + testnet deployment pending
+6. **Hardening** — reference docs, CI, security model, proptest fuzzing, shipped-policy and golden compatibility gates, dependency supply-chain gate (cargo-deny + npm audit), and the release pipeline ✅
+7. **Adapters** — sanctions/identity/jurisdiction pipelines in `crates/safeguard-adapters`, the `dataset build` CLI, and the shipped sample snapshot ✅
+8. **Deployment** — `scripts/deploy-testnet.sh` and `scripts/rehearse-upgrade.sh` runbooks with an offline-validated gate (live runs need a network) ✅
+9. **Cross-repo** — `safeguard-hooks` CI, mainnet rollout (needs the hooks polyrepo)
 
 ## Contributing
 
