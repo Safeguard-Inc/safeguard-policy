@@ -12,8 +12,10 @@
 //! a live contract) is done through the generated contract client from
 //! `safeguard-contract`; see `docs/sdk.md`.
 
+pub mod model;
+
 pub use safeguard_core::decision::{Decision, PolicyDecision, ReasonCode};
 pub use safeguard_core::evaluation::EvaluationRequest;
-pub use safeguard_core::rule::{RuleAction, RuleId, RuleType};
+pub use safeguard_core::rule::{Rule, RuleAction, RuleId, RuleType};
 pub use safeguard_core::rules::account_status::AccountStatus;
 pub use safeguard_core::rules::jurisdiction::RegionStatus;
