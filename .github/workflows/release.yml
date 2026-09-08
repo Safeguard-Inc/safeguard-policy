@@ -64,10 +64,10 @@ jobs:
         run: rustup target add wasm32v1-none
 
       - name: Build the contract wasm artifact
-        run: cargo build -p safeguard-contract --target wasm32v1-none --release
+        run: cargo build --locked -p safeguard-contract --target wasm32v1-none --release
 
       - name: Build the CLI binary
-        run: cargo build -p safeguard-cli --release
+        run: cargo build --locked -p safeguard-cli --release
 
       - name: Build the TypeScript SDK package
         run: |

@@ -20,17 +20,17 @@ rust_gate() {
     cargo fmt --all -- --check
 
     echo "==> cargo clippy (deny warnings)"
-    cargo clippy --workspace --all-targets -- -D warnings
+    cargo clippy --locked --workspace --all-targets -- -D warnings
 
     echo "==> cargo test (workspace)"
-    cargo test --workspace
+    cargo test --locked --workspace
 
     echo "==> wasm artifact (wasm32v1-none, release)"
     if ! rustup target list --installed | grep -q '^wasm32v1-none$'; then
         echo "    installing wasm32v1-none target (once)"
         rustup target add wasm32v1-none
     fi
-    cargo build -p safeguard-contract --target wasm32v1-none --release
+    cargo build --locked -p safeguard-contract --target wasm32v1-none --release
 }
 
 schema_gate() {
@@ -66,7 +66,7 @@ security_gate() {
 publish_gate() {
     echo "==> cargo package (all workspace crates)"
     for crate in core sdk adapters cli contract; do
-        cargo package -p "safeguard-$crate" --list --allow-dirty >/dev/null
+        cargo package --locked -p "safeguard-$crate" --list --allow-dirty >/dev/null
         echo "    safeguard-$crate packages cleanly"
     done
 
@@ -95,7 +95,7 @@ scripts_gate() {
 
     echo "==> adapter sample snapshot builds and validates"
     report=$(mktemp)
-    cargo run -q -p safeguard-cli -- dataset build \
+    cargo run --locked -q -p safeguard-cli -- dataset build \
         policies/fixtures/snapshots/ofac-sample.txt -o "$report" >/dev/null
     python3 - "$report" <<'EOF'
 import json, sys
