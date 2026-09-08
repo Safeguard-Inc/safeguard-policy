@@ -26,9 +26,9 @@ to transfers but not to mints") belongs to `safeguard-hooks`, which decides
 
 | Function | Auth | Description |
 | -------- | ---- | ----------- |
-| `initialize(admin)` | declared admin | Sets the administrator. Fails with `AlreadyInitialized` if called twice. |
+| `initialize(admin)` | declared admin | Sets the administrator, emitting `admin_set`. Fails with `AlreadyInitialized` if called twice. |
 | `admin() -> Address` | public | Read the current admin. |
-| `set_admin(new_admin)` | current admin + new admin | Rotate the admin (both sides authenticate). |
+| `set_admin(new_admin)` | current admin + new admin | Rotate the admin (both sides authenticate), emitting `admin_set` on a real rotation. |
 | `authorities() -> Vec<Address>` | public | Read registry authorities. |
 | `add_authority(authority)` / `remove_authority(authority)` | admin | Manage registry authorities. |
 | `policy_authorities() -> Vec<Address>` | public | Read policy authorities. |
@@ -136,6 +136,7 @@ Typed `contractevent`s published by the lifecycle and registries:
 
 | Event | Payload |
 | ----- | ------- |
+| `admin_set` | admin |
 | `policy_created` | policy_id, version, config_hash |
 | `policy_activated` | policy_id, version, config_hash |
 | `policy_deactivated` | policy_id, version |
@@ -149,13 +150,15 @@ Typed `contractevent`s published by the lifecycle and registries:
 | `policy_authority_added` | authority |
 | `policy_authority_removed` | authority |
 
-These are the **configuration-change** events audit consumes: the
-`registry_updated` family covers compliance-data mutations, and the
-`authority_added`/`authority_removed` pair is the `registry_authority_changed`
-family proving who held the registry-authority role when. The
-`policy_authority_added`/`policy_authority_removed` pair does the same for
-who could promote policy versions to active. All fire only on real changes
-(idempotent role calls and no-op registry writes stay silent).
+These are the **configuration-change** events audit consumes: `admin_set`
+proves who held the administrator role at any point (genesis on
+`initialize`, the successor on every real `set_admin`); the
+`registry_updated` family covers compliance-data mutations; and the
+`authority_added`/`authority_removed` pair is the
+`registry_authority_changed` family proving who held the registry-authority
+role when. The `policy_authority_added`/`policy_authority_removed` pair does
+the same for who could promote policy versions to active. All fire only on
+real changes (idempotent role calls and no-op registry writes stay silent).
 Transfer-level events (`transfer_approved`, `transfer_blocked`) belong to
 `safeguard-hooks`.
 

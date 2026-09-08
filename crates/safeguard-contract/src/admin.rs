@@ -21,6 +21,9 @@ use crate::error::ContractError;
 use crate::storage;
 
 /// Initialize the contract with an admin. Fails if already initialized.
+///
+/// Publishes an [`crate::events::AdminSet`] event naming the genesis admin,
+/// so audit can prove who held the role from the first block.
 pub fn initialize(env: &Env, admin: &Address) -> Result<(), ContractError> {
     if storage::is_initialized(env) {
         return Err(ContractError::AlreadyInitialized);
@@ -28,6 +31,7 @@ pub fn initialize(env: &Env, admin: &Address) -> Result<(), ContractError> {
     admin.require_auth();
     storage::set_admin(env, admin);
     storage::set_authorities(env, &vec![env]);
+    crate::events::admin_set(env, admin);
     Ok(())
 }
 
@@ -37,11 +41,18 @@ pub fn get_admin(env: &Env) -> Result<Address, ContractError> {
 }
 
 /// Replace the admin. Only the current admin may do this.
+///
+/// Publishes an [`crate::events::AdminSet`] event naming the successor on a
+/// real rotation; re-setting the same admin is a no-op that emits nothing
+/// (events describe state changes).
 pub fn set_admin(env: &Env, new_admin: &Address) -> Result<(), ContractError> {
     let current = storage::admin(env)?;
     current.require_auth();
     new_admin.require_auth();
-    storage::set_admin(env, new_admin);
+    if &current != new_admin {
+        storage::set_admin(env, new_admin);
+        crate::events::admin_set(env, new_admin);
+    }
     Ok(())
 }
 

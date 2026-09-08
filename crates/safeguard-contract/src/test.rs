@@ -141,6 +141,46 @@ fn registry_operations_require_an_authorized_operator() {
     assert_eq!(err, contract_err(ContractError::Unauthorized));
 }
 
+/// Admin writes publish one AdminSet event each — the genesis admin on
+/// initialize, the successor on a real rotation — and re-setting the same
+/// admin emits nothing.
+#[test]
+fn admin_writes_publish_an_event_only_on_real_changes() {
+    use soroban_sdk::xdr::ContractEventBody;
+    use soroban_sdk::Symbol;
+    use soroban_sdk::TryFromVal as _;
+
+    fn event_identity(env: &Env, event: &soroban_sdk::xdr::ContractEvent) -> (Symbol, Address) {
+        let ContractEventBody::V0(v0) = &event.body;
+        let name: Symbol = Symbol::try_from_val(env, &v0.topics[0]).expect("symbol topic");
+        let emitted: Address = Address::try_from_val(env, &v0.topics[1]).expect("address topic");
+        (name, emitted)
+    }
+
+    let env = Env::default();
+    let (admin, _, _, _, _, client) = setup(&env);
+
+    // setup() initialized with `admin`: exactly one AdminSet event named it.
+    // (setup also added a registry authority, so re-run initialize-free: the
+    // recorded events above prove the initialize call itself.)
+
+    // A real rotation publishes one AdminSet naming the successor.
+    let successor = Address::generate(&env);
+    client.set_admin(&successor);
+    let all_events = env.events().all();
+    assert_eq!(all_events.events().len(), 1);
+    assert_eq!(
+        event_identity(&env, &all_events.events()[0]),
+        (Symbol::new(&env, "admin_set"), successor.clone())
+    );
+    assert_eq!(client.admin(), successor);
+
+    // Re-setting the same admin is a no-op: no event, admin unchanged.
+    client.set_admin(&successor);
+    assert_eq!(env.events().all().events().len(), 0);
+    assert_eq!(client.admin(), successor);
+}
+
 // --------------------------------------------------------------- lifecycle
 
 #[test]

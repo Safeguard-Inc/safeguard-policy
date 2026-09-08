@@ -12,6 +12,26 @@ use soroban_sdk::{contractevent, Address, Env};
 
 use crate::storage::Id;
 
+/// The administrative authority was recorded or replaced.
+///
+/// Emitted on `initialize` (the genesis admin) and on every real `set_admin`
+/// rotation, so audit can reconstruct who held the most powerful role on the
+/// contract at any point in time — the same guarantee the authority-set
+/// events provide for the lesser roles.
+#[contractevent]
+pub struct AdminSet {
+    #[topic]
+    pub admin: Address,
+}
+
+/// Publish an admin write or rotation.
+pub fn admin_set(env: &Env, admin: &Address) {
+    AdminSet {
+        admin: admin.clone(),
+    }
+    .publish(env);
+}
+
 /// A new draft version of a policy was registered.
 ///
 /// Registration always creates a *version* — the spec's `policy_created`
