@@ -48,8 +48,8 @@ to transfers but not to mints") belongs to `safeguard-hooks`, which decides
 
 | Function | Auth | Description |
 | -------- | ---- | ----------- |
-| `bind_token(operator, policy_id, token)` | admin or authority | Add a token to a policy's scope, emitting `token_bound`. Idempotent. Unauthorized operators get `Unauthorized`. |
-| `unbind_token(operator, policy_id, token)` | admin or authority | Remove a token from a policy's scope, emitting `token_unbound`. Idempotent. |
+| `bind_token(operator, policy_id, token)` | admin or authority | Add a token to a policy's scope, emitting `token_bound`. Idempotent. Rejects a policy id that was never registered with `PolicyNotFound`; unauthorized operators get `RegistryAuthorityRequired`. |
+| `unbind_token(operator, policy_id, token)` | admin or authority | Remove a token from a policy's scope, emitting `token_unbound`. Idempotent. Same `PolicyNotFound` guard as bind. |
 | `bound_tokens(policy_id) -> Vec<Address>` | public | List tokens covered by a policy. |
 
 ### Compliance registries
@@ -111,23 +111,29 @@ speaks — the gate consumers should check before relying on serialization.
 
 ## Error codes
 
-Stable, never renumbered (see [`versioning.md`](versioning.md)):
+Stable and never renumbered (see [`versioning.md`](versioning.md)). Codes are
+**non-dense after the completeness audit**: the removed codes 1
+(`Unauthorized`) and 10 (`InvalidPolicyId`) are never reissued; the single
+generic authorization code was split into the two distinct authority gates
+(14, 15), and `PolicyNotFound` (4) is now produced by the registry layer.
+Every code is reachable by a real path — pinned by
+`every_error_code_is_reachable` and the code-table test.
 
 | Code | Name | Meaning |
 | ---- | ---- | ------- |
-| 1 | `Unauthorized` | Caller not in the required role. |
 | 2 | `AlreadyInitialized` | `initialize` called twice. |
-| 3 | `NotInitialized` | Admin not set (only reachable internally). |
-| 4 | `PolicyNotFound` | No such policy (reserved; version records are the current truth). |
+| 3 | `NotInitialized` | Admin not set (admin-only ops before `initialize`). |
+| 4 | `PolicyNotFound` | No version was ever registered under this policy id (bind/unbind to a ghost policy). |
 | 5 | `VersionNotFound` | No version with this number. |
 | 6 | `VersionNotDraft` | Activation attempted on a non-draft. |
 | 7 | `InvalidRuleSet` | Duplicate category/id or unknown codes. |
 | 8 | `PolicyNotActive` | No active version. |
 | 9 | `TokenNotBound` | Token not in the policy's scope. |
-| 10 | `InvalidPolicyId` | Reserved/invalid policy id. |
 | 11 | `VersionExists` | Append-only registration violated. |
 | 12 | `VersionNotActive` | Deactivation of a non-active version. |
 | 13 | `InvalidRegistryData` | Registry write carried an unknown status/region code or `dataset_version == 0`. |
+| 14 | `RegistryAuthorityRequired` | Caller is not the admin or a declared registry authority. |
+| 15 | `PolicyAuthorityRequired` | Caller is not the admin or a declared policy authority. |
 
 ## Storage layout
 

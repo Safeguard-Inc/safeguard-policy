@@ -56,6 +56,10 @@ pub enum DataKey {
     Version(VersionKey),
     /// persistent: the active version number of a policy.
     ActiveVersion(BytesN<32>),
+    /// persistent: marker that a policy id has at least one registered
+    /// version, written on first registration. Lets the registry reject
+    /// binding tokens to a policy id that was never created.
+    PolicyExists(BytesN<32>),
     /// persistent: tokens covered by a policy.
     TokenBindings(BytesN<32>),
     /// persistent: reverse index token → policy, maintained by the registry
@@ -218,6 +222,19 @@ pub fn set_version_record(env: &Env, record: &PolicyVersionRecord) {
         }),
         record,
     );
+}
+
+/// Whether any version has ever been registered under this policy id.
+///
+/// The marker is written on first registration and never removed (policy
+/// history is append-only), so it is the authoritative "policy exists"
+/// check for the registry layer.
+pub fn policy_exists(env: &Env, policy_id: &BytesN<32>) -> bool {
+    get_persistent::<bool>(env, &DataKey::PolicyExists(policy_id.clone())).is_some()
+}
+
+pub fn set_policy_exists(env: &Env, policy_id: &BytesN<32>) {
+    set_persistent(env, &DataKey::PolicyExists(policy_id.clone()), &true);
 }
 
 pub fn active_version(env: &Env, policy_id: &BytesN<32>) -> Option<u32> {

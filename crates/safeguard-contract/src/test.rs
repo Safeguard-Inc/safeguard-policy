@@ -143,7 +143,7 @@ fn registry_operations_require_an_authorized_operator() {
     let err = client
         .try_bind_token(&stranger, &policy, &token)
         .unwrap_err();
-    assert_eq!(err, contract_err(ContractError::Unauthorized));
+    assert_eq!(err, contract_err(ContractError::RegistryAuthorityRequired));
 }
 
 /// Admin writes publish one AdminSet event each — the genesis admin on
@@ -379,13 +379,13 @@ fn only_admin_or_policy_authority_can_activate_or_deactivate() {
     let err = client
         .try_activate_version(&authority, &policy, &1)
         .unwrap_err();
-    assert_eq!(err, contract_err(ContractError::Unauthorized));
+    assert_eq!(err, contract_err(ContractError::PolicyAuthorityRequired));
 
     // A stranger cannot activate either.
     let err = client
         .try_activate_version(&stranger, &policy, &1)
         .unwrap_err();
-    assert_eq!(err, contract_err(ContractError::Unauthorized));
+    assert_eq!(err, contract_err(ContractError::PolicyAuthorityRequired));
 
     // The policy authority can.
     client.activate_version(&policy_authority, &policy, &1);
@@ -395,7 +395,7 @@ fn only_admin_or_policy_authority_can_activate_or_deactivate() {
     let err = client
         .try_deactivate_version(&authority, &policy, &1)
         .unwrap_err();
-    assert_eq!(err, contract_err(ContractError::Unauthorized));
+    assert_eq!(err, contract_err(ContractError::PolicyAuthorityRequired));
 
     // The policy authority can.
     client.deactivate_version(&policy_authority, &policy, &1);
@@ -579,7 +579,9 @@ fn scope_guards_refuse_evaluation_outside_the_policy() {
     let env = Env::default();
     let (admin, _, _, token, policy, client) = setup(&env);
 
-    // No active version yet.
+    // A draft version exists (policy is registered) but nothing is active
+    // yet: evaluation refuses with PolicyNotActive.
+    register_default_policy(&env, &client, &policy, 1);
     client.bind_token(&admin, &policy, &token);
     assert_eq!(
         client
@@ -589,7 +591,6 @@ fn scope_guards_refuse_evaluation_outside_the_policy() {
     );
 
     // Active version but the token is not bound.
-    register_default_policy(&env, &client, &policy, 1);
     client.activate_version(&admin, &policy, &1);
     let other_token = Address::generate(&env);
     assert_eq!(
@@ -623,6 +624,7 @@ fn token_bindings_publish_events_only_on_real_changes() {
 
     let env = Env::default();
     let (admin, _, _, token, policy, client) = setup(&env);
+    register_default_policy(&env, &client, &policy, 1);
 
     // Binding publishes one TokenBound naming the policy and the token.
     client.bind_token(&admin, &policy, &token);
@@ -658,6 +660,85 @@ fn token_bindings_publish_events_only_on_real_changes() {
     // Unbinding a token outside scope is a no-op: no event.
     client.unbind_token(&admin, &policy, &token);
     assert_eq!(env.events().all().events().len(), 0);
+}
+
+/// §8 negative: binding a token to a policy id that was never registered is
+/// a caller error — PolicyNotFound (4) — instead of silently creating a dead
+/// binding that would route enforcement to a policy with no evaluable
+/// version. Same for unbind: a no-op on a nonexistent policy would mask a
+/// typo'd policy id.
+#[test]
+fn bind_and_unbind_reject_unregistered_policy_ids() {
+    let env = Env::default();
+    let (admin, _, _, token, _, client) = setup(&env);
+    let ghost = rid(&env, "GHOST-POLICY");
+
+    let err = client.try_bind_token(&admin, &ghost, &token).unwrap_err();
+    assert_eq!(err, contract_err(ContractError::PolicyNotFound));
+
+    let err = client.try_unbind_token(&admin, &ghost, &token).unwrap_err();
+    assert_eq!(err, contract_err(ContractError::PolicyNotFound));
+
+    // Nothing was written: the ghost policy still has no bindings and no
+    // reverse index entry.
+    assert_eq!(client.bound_tokens(&ghost), Vec::new(&env));
+}
+
+/// Every contract error code is reachable by a real path, and the codes
+/// themselves are the stable public API documented in
+/// `docs/contract-interface.md`. This test lists the producing call for each
+/// code so the audit can prove none of them is dead surface.
+#[test]
+fn every_error_code_is_reachable() {
+    use crate::error::ContractError as E;
+
+    let env = Env::default();
+    let (admin, _authority, stranger, _token, policy, client) = setup(&env);
+
+    // 2 AlreadyInitialized — re-initializing an initialized contract.
+    assert_eq!(
+        client.try_initialize(&admin).unwrap_err(),
+        contract_err(E::AlreadyInitialized)
+    );
+    // 3 NotInitialized — admin op before initialize. A freshly registered
+    // contract has no admin yet; the admin-only path (register_version)
+    // fails closed with NotInitialized.
+    let raw = Env::default();
+    raw.mock_all_auths();
+    let raw_contract = raw.register(PolicyContract, ());
+    let raw_client = PolicyContractClient::new(&raw, &raw_contract);
+    let err = raw_client
+        .try_register_version(
+            &rid(&raw, "GHOST-POLICY"),
+            &1,
+            &config_hash(&raw, 1),
+            &Vec::new(&raw),
+        )
+        .unwrap_err();
+    assert_eq!(err, contract_err(E::NotInitialized));
+    // 4 PolicyNotFound — covered above (bind/unbind to a ghost policy).
+    // 5 VersionNotFound — activate a version that was never registered.
+    assert_eq!(
+        client
+            .try_activate_version(&admin, &policy, &99)
+            .unwrap_err(),
+        contract_err(E::VersionNotFound)
+    );
+    // 14 RegistryAuthorityRequired — a stranger writing registry data.
+    assert_eq!(
+        client
+            .try_set_identity(&stranger, &stranger, &0, &rid(&env, "X"), &0)
+            .unwrap_err(),
+        contract_err(E::RegistryAuthorityRequired)
+    );
+    // 15 PolicyAuthorityRequired — a stranger (or registry authority)
+    // attempting version lifecycle control.
+    assert_eq!(
+        client
+            .try_deactivate_version(&stranger, &policy, &1)
+            .unwrap_err(),
+        contract_err(E::PolicyAuthorityRequired)
+    );
 }
 
 // -------------------------------------------------------------- registries
@@ -742,7 +823,7 @@ fn identity_registry_lifecycle_and_events() {
     let err = client
         .try_set_identity(&stranger, &account, &0, &rid(&env, "ATT-1"), &0)
         .unwrap_err();
-    assert_eq!(err, contract_err(ContractError::Unauthorized));
+    assert_eq!(err, contract_err(ContractError::RegistryAuthorityRequired));
 }
 
 /// §18 negative: an account with no identity record is genuinely unknown —
@@ -774,7 +855,7 @@ fn unknown_account_has_no_record_and_fails_closed() {
     let err = client
         .try_set_identity(&stranger, &stranger, &0, &rid(&env, "ATT-1"), &0)
         .unwrap_err();
-    assert_eq!(err, contract_err(ContractError::Unauthorized));
+    assert_eq!(err, contract_err(ContractError::RegistryAuthorityRequired));
 
     // Even a registry authority writing an *expired* record cannot make the
     // account active: evaluation never consults wall-clock time, so the
@@ -821,7 +902,7 @@ fn expired_attestation_is_stored_unmutated_and_requires_authority_to_replace() {
             &9_999_999_999,
         )
         .unwrap_err();
-    assert_eq!(err, contract_err(ContractError::Unauthorized));
+    assert_eq!(err, contract_err(ContractError::RegistryAuthorityRequired));
 
     client.set_identity(
         &admin,
@@ -1193,9 +1274,11 @@ fn the_stable_numeric_interface_is_pinned() {
     // Schema version the contract speaks.
     assert_eq!(client.schema_version(), 1);
 
-    // Contract error codes (docs/contract-interface.md table).
+    // Contract error codes (docs/contract-interface.md table). Codes are
+    // non-dense after the completeness audit: 1 (Unauthorized) and 10
+    // (InvalidPolicyId) were removed and are never reissued; 14/15 replaced
+    // the single generic authorization code with distinct authority gates.
     use crate::error::ContractError as E;
-    assert_eq!(E::Unauthorized as u32, 1);
     assert_eq!(E::AlreadyInitialized as u32, 2);
     assert_eq!(E::NotInitialized as u32, 3);
     assert_eq!(E::PolicyNotFound as u32, 4);
@@ -1204,10 +1287,11 @@ fn the_stable_numeric_interface_is_pinned() {
     assert_eq!(E::InvalidRuleSet as u32, 7);
     assert_eq!(E::PolicyNotActive as u32, 8);
     assert_eq!(E::TokenNotBound as u32, 9);
-    assert_eq!(E::InvalidPolicyId as u32, 10);
     assert_eq!(E::VersionExists as u32, 11);
     assert_eq!(E::VersionNotActive as u32, 12);
     assert_eq!(E::InvalidRegistryData as u32, 13);
+    assert_eq!(E::RegistryAuthorityRequired as u32, 14);
+    assert_eq!(E::PolicyAuthorityRequired as u32, 15);
 
     // Core decision/reason/rule codes echoed into EvaluationResult and
     // events (docs/rule-engine.md).

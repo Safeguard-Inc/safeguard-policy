@@ -33,6 +33,13 @@ pub fn bind_token(
 ) -> Result<(), ContractError> {
     admin::require_admin_or_authority(env, operator)?;
 
+    // Binding a token to a policy id that was never registered would create
+    // a dead binding (tokens routed to a policy with no evaluable version).
+    // Fail fast instead of silently misrouting.
+    if !storage::policy_exists(env, policy_id) {
+        return Err(ContractError::PolicyNotFound);
+    }
+
     let mut tokens = storage::token_bindings(env, policy_id);
     if !tokens.contains(token) {
         tokens.push_back(token.clone());
@@ -58,6 +65,12 @@ pub fn unbind_token(
     token: &Address,
 ) -> Result<(), ContractError> {
     admin::require_admin_or_authority(env, operator)?;
+
+    // Mirror bind: unbinding from a policy id that never existed is a
+    // caller error, not a silent no-op.
+    if !storage::policy_exists(env, policy_id) {
+        return Err(ContractError::PolicyNotFound);
+    }
 
     let tokens = storage::token_bindings(env, policy_id);
     let mut remaining: Vec<Address> = Vec::new(env);

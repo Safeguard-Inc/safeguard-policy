@@ -182,7 +182,7 @@ pub fn require_admin_or_policy_authority(
     declared: &Address,
 ) -> Result<Address, ContractError> {
     if !is_admin_or_policy_authority(env, declared) {
-        return Err(ContractError::Unauthorized);
+        return Err(ContractError::PolicyAuthorityRequired);
     }
     declared.require_auth();
     Ok(declared.clone())
@@ -201,7 +201,7 @@ pub fn require_admin(env: &Env) -> Result<Address, ContractError> {
 /// requires that the declared address authorized the call.
 pub fn require_admin_or_authority(env: &Env, declared: &Address) -> Result<Address, ContractError> {
     if !is_admin_or_authority(env, declared) {
-        return Err(ContractError::Unauthorized);
+        return Err(ContractError::RegistryAuthorityRequired);
     }
     declared.require_auth();
     Ok(declared.clone())
