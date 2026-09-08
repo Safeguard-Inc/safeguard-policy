@@ -37,6 +37,10 @@ pub fn bind_token(
     if !tokens.contains(token) {
         tokens.push_back(token.clone());
         storage::set_token_bindings(env, policy_id, &tokens);
+        // Reverse index for the enforcement entry point: a token bound here
+        // resolves to this policy for `is_authorized`. Last binding wins
+        // (see `storage::token_policy`); the index is cleared on unbind.
+        storage::set_token_policy(env, token, policy_id);
         crate::events::token_bound(env, policy_id, token);
     }
     Ok(())
@@ -67,6 +71,11 @@ pub fn unbind_token(
     }
     if removed {
         storage::set_token_bindings(env, policy_id, &remaining);
+        // Only clear the reverse index when it still points at this policy;
+        // a token later bound elsewhere keeps its newer routing.
+        if storage::token_policy(env, token).as_ref() == Some(policy_id) {
+            storage::clear_token_policy(env, token);
+        }
         crate::events::token_unbound(env, policy_id, token);
     }
     Ok(())

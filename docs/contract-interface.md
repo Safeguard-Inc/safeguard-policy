@@ -75,12 +75,28 @@ authority, reads are public.
 | Function | Auth | Description |
 | -------- | ---- | ----------- |
 | `evaluate(policy_id, token, input) -> EvaluationResult` | public | Evaluate a subject against the active version for a bound token. Read-only and deterministic. |
+| `is_authorized(account, token) -> bool` | public | Enforcement wire entry point: decide `account` on `token` from on-chain state alone. Never reverts; `true` only on an explicit approve (see below). |
 
 `EvaluationInput` carries the caller-resolved facts (account status code,
 allowlist membership, denylist match flag, sanctions match claim,
 jurisdiction code, and the `subject` hash + `account` that key the
 on-chain registries). `EvaluationResult` returns the active policy version,
 decision code, reason code and the triggering rule id.
+
+**`is_authorized` — the ENFORCE seam.** This is the `is_authorized(account,
+token) -> bool` wire function the `safeguard-hooks` policy-client calls
+(see `interfaces/policy/policy.md` in that repo). The wire carries only an
+account and a token, so the decision is derived exclusively from this
+contract's on-chain state: the policy governing the token (resolved through
+the registry's reverse index, and required to be bound and active), the
+account's identity record (an account with no record is `Unknown` → denied),
+and the sanctions/jurisdiction registries via the same override as
+`evaluate`. Allowlist/denylist/sanctions *membership* are caller-supplied
+facts in the richer `evaluate` flow and are treated as absent here — a
+deployment wiring ENFORCE to this contract must use a rule set decidable
+from on-chain state. Only an explicit `approve` authorizes: block and flag
+decisions (unknown identity, restricted jurisdiction, review outcomes) all
+answer `false`, and any evaluation error answers `false` (fail closed).
 
 **Registry resolution.** When the compliance registries hold an entry, the
 sanctions match and the jurisdiction classification are resolved from the

@@ -20,7 +20,10 @@ use crate::evaluate::{self, EvaluationInput, EvaluationResult};
 use crate::lifecycle;
 use crate::registries::{identity, jurisdiction, sanctions};
 use crate::registry;
-use crate::storage::{IdentityRecord, PolicyVersionRecord, RuleRecord, SanctionsEntryRecord};
+use crate::storage::{self, IdentityRecord, PolicyVersionRecord, RuleRecord, SanctionsEntryRecord};
+
+use safeguard_core::decision::Decision;
+use safeguard_core::rules::account_status::AccountStatus;
 
 #[contract]
 pub struct PolicyContract;
@@ -279,5 +282,62 @@ impl PolicyContract {
         input: EvaluationInput,
     ) -> Result<EvaluationResult, ContractError> {
         evaluate::evaluate(&env, &policy_id, &token, &input)
+    }
+
+    /// The enforcement wire entry point: is `account` authorized on `token`?
+    ///
+    /// This is the `is_authorized(account, token) -> bool` seam the
+    /// ENFORCE layer (`safeguard-hooks` policy-client) calls. It never
+    /// reverts — the answer is always a boolean — and it never returns
+    /// `true` unless the decision is an explicit **approve**: a block, a
+    /// flag (unknown identity, restricted jurisdiction), an inactive
+    /// policy, or an unbound token all answer `false` (fail closed).
+    ///
+    /// The decision is derived exclusively from this contract's on-chain
+    /// state — the wire carries only an account and a token:
+    ///
+    /// * the policy governing `token` is resolved through the registry's
+    ///   reverse index and must be bound and active;
+    /// * `account`'s status comes from its identity record, and an account
+    ///   with no record is `Unknown` (fail closed);
+    /// * allowlist/denylist/sanctions membership are caller-supplied
+    ///   compliance facts in the richer `evaluate` flow and are treated as
+    ///   absent here — a deployment wiring ENFORCE to this contract must
+    ///   use a rule set that is decidable from on-chain state (identity
+    ///   status, sanctions/jurisdiction registries);
+    /// * jurisdiction and sanctions follow the same on-chain registry
+    ///   override as `evaluate`.
+    pub fn is_authorized(env: Env, account: Address, token: Address) -> bool {
+        // Resolve and verify coverage: the reverse index must exist and the
+        // policy it names must still bind the token.
+        let Some(policy_id) = storage::token_policy(&env, &token) else {
+            return false;
+        };
+        if !registry::is_bound(&env, &policy_id, &token) {
+            return false;
+        }
+
+        // The account's structural status: an account with no verification
+        // record is Unknown, which the evaluator flags (fail closed).
+        let account_status = storage::identity_record(&env, &account)
+            .map(|record| record.status)
+            .unwrap_or(AccountStatus::Unknown.to_code());
+
+        let input = EvaluationInput {
+            account_status,
+            allowlist_member: false,
+            denylist_matched: false,
+            sanctions_matched: false,
+            jurisdiction: storage::jurisdiction(&env, &account).unwrap_or(0),
+            subject: BytesN::from_array(&env, &[0u8; 32]),
+            account: account.clone(),
+        };
+
+        match evaluate::evaluate(&env, &policy_id, &token, &input) {
+            // Only an explicit approve authorizes; a flag (e.g. unknown
+            // status) is a review outcome, not a pass, on this wire.
+            Ok(result) => result.decision == Decision::Approve.to_code(),
+            Err(_) => false,
+        }
     }
 }

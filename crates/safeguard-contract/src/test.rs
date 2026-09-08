@@ -1259,3 +1259,151 @@ fn the_stable_numeric_interface_is_pinned() {
     assert_eq!(Rg::Prohibited.to_code(), 2);
     assert_eq!(Rg::Unknown.to_code(), 3);
 }
+
+// -------------------------------------------- enforcement wire (is_authorized)
+
+/// An enforcement-shaped policy: rules decidable from on-chain state only.
+/// The wire carries just an account and a token, so allowlist/denylist
+/// membership (caller-supplied facts in `evaluate`) is always absent here;
+/// this policy has no such rules.
+fn register_enforcement_policy(
+    env: &Env,
+    client: &PolicyContractClient,
+    policy: &Id,
+    version: u32,
+) {
+    let rules = vec![env];
+    client.register_version(policy, &version, &config_hash(env, 2), &rules);
+}
+
+#[test]
+fn is_authorized_approves_only_verified_active_accounts_on_a_bound_token() {
+    let env = Env::default();
+    let (admin, _, _, token, policy, client) = setup(&env);
+    register_enforcement_policy(&env, &client, &policy, 1);
+    client.activate_version(&admin, &policy, &1);
+    client.bind_token(&admin, &policy, &token);
+
+    let alice = Address::generate(&env);
+    // No identity record yet: the status defaults to Unknown, which the
+    // evaluator flags — an unverified account is never authorized.
+    assert!(!client.is_authorized(&alice, &token));
+
+    // Verified active: authorized.
+    client.set_identity(
+        &admin,
+        &alice,
+        &AccountStatus::Active.to_code(),
+        &config_hash(&env, 7),
+        &0,
+    );
+    assert!(client.is_authorized(&alice, &token));
+
+    // Frozen and suspended accounts are blocked, not flagged.
+    client.set_identity(
+        &admin,
+        &alice,
+        &AccountStatus::Frozen.to_code(),
+        &config_hash(&env, 7),
+        &0,
+    );
+    assert!(!client.is_authorized(&alice, &token));
+    client.set_identity(
+        &admin,
+        &alice,
+        &AccountStatus::Suspended.to_code(),
+        &config_hash(&env, 7),
+        &0,
+    );
+    assert!(!client.is_authorized(&alice, &token));
+
+    // A restricted account flags (review outcome) — not an approve.
+    client.set_identity(
+        &admin,
+        &alice,
+        &AccountStatus::Restricted.to_code(),
+        &config_hash(&env, 7),
+        &0,
+    );
+    assert!(!client.is_authorized(&alice, &token));
+}
+
+#[test]
+fn is_authorized_denies_unbound_tokens_and_inactive_policies() {
+    let env = Env::default();
+    let (admin, _, _, token, policy, client) = setup(&env);
+    let alice = Address::generate(&env);
+    client.set_identity(
+        &admin,
+        &alice,
+        &AccountStatus::Active.to_code(),
+        &config_hash(&env, 7),
+        &0,
+    );
+
+    // Registered but never activated: no active version → deny.
+    register_enforcement_policy(&env, &client, &policy, 1);
+    assert!(!client.is_authorized(&alice, &token));
+
+    // Activated but the token is not bound: no reverse index → deny.
+    client.activate_version(&admin, &policy, &1);
+    assert!(!client.is_authorized(&alice, &token));
+
+    // Bound: authorized.
+    client.bind_token(&admin, &policy, &token);
+    assert!(client.is_authorized(&alice, &token));
+
+    // Unbind clears the reverse index → deny again.
+    client.unbind_token(&admin, &policy, &token);
+    assert!(!client.is_authorized(&alice, &token));
+}
+
+#[test]
+fn is_authorized_consults_the_on_chain_sanctions_registry() {
+    use safeguard_core::registries::sanctions::SanctionsStatus;
+
+    let env = Env::default();
+    let (admin, _, _, token, policy, client) = setup(&env);
+    let rules = vec![
+        &env,
+        RuleRecord {
+            rule_id: rid(&env, "SANCTIONS-001"),
+            rule_type: RuleType::Sanctions.to_code(),
+            action: RuleAction::Block.to_code(),
+        },
+    ];
+    client.register_version(&policy, &1, &config_hash(&env, 3), &rules);
+    client.activate_version(&admin, &policy, &1);
+    client.bind_token(&admin, &policy, &token);
+
+    let alice = Address::generate(&env);
+    client.set_identity(
+        &admin,
+        &alice,
+        &AccountStatus::Active.to_code(),
+        &config_hash(&env, 7),
+        &0,
+    );
+
+    // No entry at the wire's subject key (zeros — subject hashes of
+    // provider text are not derivable from an account on this wire): the
+    // caller's claim (false) stands → allowed.
+    assert!(client.is_authorized(&alice, &token));
+
+    // An active sanctions entry keyed at the wire subject blocks; retiring
+    // it (inactive) stops the block.
+    let subject = BytesN::from_array(&env, &[0u8; 32]);
+    client.set_sanctions_entry(
+        &admin,
+        &subject,
+        &rid(&env, "OFAC-SDN"),
+        &SanctionsStatus::Active.to_code(),
+        &1,
+        &0,
+        &Bytes::from_array(&env, b"ofac"),
+    );
+    assert!(!client.is_authorized(&alice, &token));
+
+    client.retire_sanctions_entry(&admin, &subject);
+    assert!(client.is_authorized(&alice, &token));
+}

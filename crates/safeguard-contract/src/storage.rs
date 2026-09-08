@@ -15,6 +15,7 @@
 //! Version(VersionKey)   → PolicyVersionRecord
 //! ActiveVersion(policy) → u32
 //! TokenBindings(policy) → Vec<Address>
+//! TokenPolicy(token)    → policy id (reverse index for `is_authorized`)
 //! ```
 //!
 //! All multi-byte ids cross the boundary as [`BytesN::<32>`] so arbitrary
@@ -57,6 +58,10 @@ pub enum DataKey {
     ActiveVersion(BytesN<32>),
     /// persistent: tokens covered by a policy.
     TokenBindings(BytesN<32>),
+    /// persistent: reverse index token → policy, maintained by the registry
+    /// so the enforcement wire entry point (`is_authorized`) can resolve
+    /// which policy governs a token without enumerating every policy.
+    TokenPolicy(Address),
     /// persistent: identity verification record of an account.
     Identity(Address),
     /// persistent: normalized sanctions entry, keyed by subject hash.
@@ -235,6 +240,28 @@ pub fn token_bindings(env: &Env, policy_id: &BytesN<32>) -> Vec<Address> {
 
 pub fn set_token_bindings(env: &Env, policy_id: &BytesN<32>, tokens: &Vec<Address>) {
     set_persistent(env, &DataKey::TokenBindings(policy_id.clone()), tokens);
+}
+
+/// The policy a token's binding points at, when one has ever been bound.
+///
+/// The reverse index is maintained by the registry (`bind_token` writes it,
+/// `unbind_token` clears it); `is_authorized` resolves policy coverage for a
+/// token through it. Last binding wins when a token is bound to several
+/// policies — the enforcement entry point is single-policy by design, and
+/// the registry also verifies the resolved policy still binds the token
+/// before evaluating.
+pub fn token_policy(env: &Env, token: &Address) -> Option<BytesN<32>> {
+    get_persistent(env, &DataKey::TokenPolicy(token.clone()))
+}
+
+pub fn set_token_policy(env: &Env, token: &Address, policy_id: &BytesN<32>) {
+    set_persistent(env, &DataKey::TokenPolicy(token.clone()), policy_id);
+}
+
+pub fn clear_token_policy(env: &Env, token: &Address) {
+    env.storage()
+        .persistent()
+        .remove(&DataKey::TokenPolicy(token.clone()));
 }
 
 // ------------------------------------------------------------- registries
