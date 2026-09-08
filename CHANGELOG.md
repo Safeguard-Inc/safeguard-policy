@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — governance and hardening
+
+- **CODEOWNERS** — every change has a named reviewer.
+- **Security issue template** — structured security intake matching the
+  sibling polyrepos (private reporting via SECURITY.md).
+- **CI hardening** — all GitHub Actions pinned to commit SHAs; cargo
+  invocations build against the committed lockfile (`--locked`).
+- **TypeScript SDK packaging** — the published `files` set is the whole
+  `dist/` (new modules can no longer be omitted), with declared Node
+  `engines` and `sideEffects: false`.
+- **README badges** — CI and security workflow status at the top of the
+  README.
+
 ### Added
 
 - Initial repository structure for the `safeguard-policy` polyrepo:
