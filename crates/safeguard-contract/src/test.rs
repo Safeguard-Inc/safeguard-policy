@@ -158,11 +158,10 @@ fn admin_writes_publish_an_event_only_on_real_changes() {
     }
 
     let env = Env::default();
-    let (admin, _, _, _, _, client) = setup(&env);
+    let (_, _, _, _, _, client) = setup(&env);
 
-    // setup() initialized with `admin`: exactly one AdminSet event named it.
-    // (setup also added a registry authority, so re-run initialize-free: the
-    // recorded events above prove the initialize call itself.)
+    // setup() initialized with an admin: its AdminSet event is asserted in
+    // the initialization test below; this test pins the rotation path only.
 
     // A real rotation publishes one AdminSet naming the successor.
     let successor = Address::generate(&env);
