@@ -188,6 +188,7 @@ EOF
                 --source-account "$ADMIN" \
                 --id "$ALIAS" \
                 -- bind_token \
+                --operator "$ADMIN" \
                 --policy_id "$POLICY_ID_HEX" \
                 --token "$token"
     done < <(python3 - <<'EOF'
