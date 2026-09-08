@@ -1,0 +1,29 @@
+name: Security
+description: Threat-model review, hardening, or a suspected vulnerability (report real vulnerabilities via SECURITY.md, privately).
+title: "security: "
+labels: ["security"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - Threat-model review
+        - Hardening / new attack test
+        - Suspected vulnerability (see SECURITY.md for private reporting first)
+    validations:
+      required: true
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Attack scenario
+      description: Determinism violation, registry manipulation, role bypass, scope confusion, or other — with the expected and actual outcomes.
+    validations:
+      required: true
+  - type: textarea
+    id: invariants
+    attributes:
+      label: Invariants at risk
+      description: Which invariant could break (deterministic evaluation, fail-closed defaults, no silent mutation of policy state, one-way versioning)?
+    validations:
+      required: true
