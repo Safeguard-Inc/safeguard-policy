@@ -148,8 +148,30 @@ fn assemble(
     record: &PolicyVersionRecord,
     input: &EvaluationInput,
 ) -> Result<EvaluationRequest, ContractError> {
-    let sanctions_matched = resolve_sanctions(env, input);
-    let jurisdiction = resolve_jurisdiction(env, input);
+    // Registry reads are metered, so they are only paid when the policy
+    // actually enables the rule that consumes them: a policy without a
+    // sanctions or jurisdiction rule must not pay a sanctions/jurisdiction
+    // storage read on every evaluation. This is the common ENFORCE shape
+    // (a rule set decidable from on-chain state), so the saving lands on
+    // the hot is_authorized path.
+    let sanctions_rule = record
+        .rules
+        .iter()
+        .any(|r| r.rule_type == RuleType::Sanctions.to_code());
+    let jurisdiction_rule = record
+        .rules
+        .iter()
+        .any(|r| r.rule_type == RuleType::Jurisdiction.to_code());
+    let sanctions_matched = if sanctions_rule {
+        resolve_sanctions(env, input)
+    } else {
+        input.sanctions_matched
+    };
+    let jurisdiction = if jurisdiction_rule {
+        resolve_jurisdiction(env, input)
+    } else {
+        decode_region(input.jurisdiction)
+    };
 
     let mut request = EvaluationRequest {
         account_status: decode_status(input.account_status),
@@ -222,6 +244,25 @@ pub fn evaluate(
     if !registry::is_bound(env, policy_id, token) {
         return Err(ContractError::TokenNotBound);
     }
+    evaluate_active(env, policy_id, active, input)
+}
+
+/// Evaluate against an active version whose token coverage the caller has
+/// already established.
+///
+/// Kept private to the crate: `evaluate` uses it after its own scope checks,
+/// and the enforcement entry point `is_authorized` uses it when the
+/// registry's reverse index already proves the token is bound to the policy
+/// — re-reading the full token-binding list per authorization call would be
+/// pure waste on the hot enforcement path. The registry maintains the index
+/// atomically with the bindings (set on bind, cleared on unbind), so the
+/// index's presence is the coverage proof.
+pub(crate) fn evaluate_active(
+    env: &Env,
+    policy_id: &BytesN<32>,
+    active: u32,
+    input: &EvaluationInput,
+) -> Result<EvaluationResult, ContractError> {
     let record =
         storage::version_record(env, policy_id, active).ok_or(ContractError::VersionNotFound)?;
 

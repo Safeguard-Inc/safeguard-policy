@@ -308,14 +308,16 @@ impl PolicyContract {
     /// * jurisdiction and sanctions follow the same on-chain registry
     ///   override as `evaluate`.
     pub fn is_authorized(env: Env, account: Address, token: Address) -> bool {
-        // Resolve and verify coverage: the reverse index must exist and the
-        // policy it names must still bind the token.
+        // Resolve coverage through the registry's reverse index. The index
+        // is maintained atomically with the bindings (set on bind, cleared
+        // on unbind), so its presence proves the token is bound to the
+        // policy it names — no need to re-read the full binding list.
         let Some(policy_id) = storage::token_policy(&env, &token) else {
             return false;
         };
-        if !registry::is_bound(&env, &policy_id, &token) {
+        let Some(active) = storage::active_version(&env, &policy_id) else {
             return false;
-        }
+        };
 
         // The account's structural status: an account with no verification
         // record is Unknown, which the evaluator flags (fail closed).
@@ -333,7 +335,7 @@ impl PolicyContract {
             account: account.clone(),
         };
 
-        match evaluate::evaluate(&env, &policy_id, &token, &input) {
+        match evaluate::evaluate_active(&env, &policy_id, active, &input) {
             // Only an explicit approve authorizes; a flag (e.g. unknown
             // status) is a review outcome, not a pass, on this wire.
             Ok(result) => result.decision == Decision::Approve.to_code(),

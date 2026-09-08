@@ -2,7 +2,7 @@
   "network": "testnet",
   "rpc_url": "https://soroban-testnet.stellar.org",
   "network_passphrase": "Test SDF Network ; September 2015",
-  "contract_id": "CCGXR4EOTFFWJA2SOZOAKUWK3DVDBWU2HR5ZSM54PGJ2KRTEFIRK2OV3",
+  "contract_id": "CCOEMBBUNF3WO24YCH637G2TKCFGBN6QMUSUB4ODPLPGF4BUS64WPR47",
   "admin": {
     "public_key": "GB3P6MQJIYFNWFQ5SU3PDUWOIBKKS5O7QF5LMIPQ3WQBXSXK4LNFIRO3",
     "secret_key_env": "SAFEGUARD_ADMIN_SK"
@@ -35,5 +35,5 @@
       "note": "Sandbox token address used by the compliance-hooks testnet E2E"
     }
   ],
-  "description": "Live Testnet deployment verified end-to-end on 2026-09-08. Verified live: evaluate() approves a compliant subject and blocks denylist/sanctions matches; is_authorized(account, token) approves only verified-active accounts on a bound token and answers false for unverified, frozen, suspended, or restricted accounts, unbound tokens, and inactive policies; identity records drive the enforcement decision; the real compliance-hooks deployment wired to this contract passes every enforcement gate. The admin secret key lives in the SAFEGUARD_ADMIN_SK env var only — never in this file."
+  "description": "Live Testnet deployment verified end-to-end on 2026-09-08. Verified live: evaluate() approves a compliant subject and blocks denylist/sanctions matches; is_authorized(account, token) approves only verified-active accounts on a bound token and answers false for unverified, frozen, suspended, or restricted accounts, unbound tokens, and inactive policies; identity records drive the enforcement decision; the real compliance-hooks deployment wired to this contract passes every enforcement gate. Redeployed 2026-09-08 with the gas-optimized wasm (docs/gas.md): is_authorized now skips redundant token-binding reads and registry lookups for rules the policy does not enable. The admin secret key lives in the SAFEGUARD_ADMIN_SK env var only — never in this file."
 }
