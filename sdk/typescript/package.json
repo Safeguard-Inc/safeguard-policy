@@ -10,17 +10,12 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist/index.js",
-    "dist/index.d.ts",
-    "dist/decision.js",
-    "dist/decision.d.ts",
-    "dist/registry.js",
-    "dist/registry.d.ts",
-    "dist/types.js",
-    "dist/types.d.ts",
-    "dist/validate.js",
-    "dist/validate.d.ts"
+    "dist"
   ],
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
   "publishConfig": {
     "access": "public"
   },
