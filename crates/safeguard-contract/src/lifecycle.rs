@@ -14,12 +14,12 @@
 //! require the admin or a policy authority (the spec's Policy Admin / Policy
 //! Authority split). Lifecycle events are published for `safeguard-audit`.
 
-use soroban_sdk::{Address, Env, Vec};
+use soroban_sdk::{Address, BytesN, Env, Vec};
 
 use crate::admin;
 use crate::error::ContractError;
 use crate::events::{PolicyActivated, PolicyCreated, PolicyDeactivated};
-use crate::storage::{self, Id, PolicyVersionRecord, RuleRecord};
+use crate::storage::{self, PolicyVersionRecord, RuleRecord};
 
 use safeguard_core::policy::RuleSet;
 use safeguard_core::rule::{Rule, RuleAction, RuleId, RuleType};
@@ -49,9 +49,9 @@ fn normalize_rules(rules: &Vec<RuleRecord>) -> Result<RuleSet, ContractError> {
 /// Register a new draft version of a policy. Admin only. Append-only.
 pub fn register_version(
     env: &Env,
-    policy_id: &Id,
+    policy_id: &BytesN<32>,
     version: u32,
-    config_hash: &Id,
+    config_hash: &BytesN<32>,
     rules: &Vec<RuleRecord>,
 ) -> Result<(), ContractError> {
     admin::require_admin(env)?;
@@ -100,7 +100,7 @@ pub fn register_version(
 pub fn activate_version(
     env: &Env,
     operator: &Address,
-    policy_id: &Id,
+    policy_id: &BytesN<32>,
     version: u32,
 ) -> Result<(), ContractError> {
     admin::require_admin_or_policy_authority(env, operator)?;
@@ -139,7 +139,7 @@ pub fn activate_version(
 pub fn deactivate_version(
     env: &Env,
     operator: &Address,
-    policy_id: &Id,
+    policy_id: &BytesN<32>,
     version: u32,
 ) -> Result<(), ContractError> {
     admin::require_admin_or_policy_authority(env, operator)?;
@@ -167,14 +167,17 @@ pub fn deactivate_version(
 /// The record of a specific version (public read).
 pub fn get_version(
     env: &Env,
-    policy_id: &Id,
+    policy_id: &BytesN<32>,
     version: u32,
 ) -> Result<PolicyVersionRecord, ContractError> {
     storage::version_record(env, policy_id, version).ok_or(ContractError::VersionNotFound)
 }
 
 /// The record of the active version of a policy (public read).
-pub fn get_active_version(env: &Env, policy_id: &Id) -> Result<PolicyVersionRecord, ContractError> {
+pub fn get_active_version(
+    env: &Env,
+    policy_id: &BytesN<32>,
+) -> Result<PolicyVersionRecord, ContractError> {
     let version = storage::active_version(env, policy_id).ok_or(ContractError::PolicyNotActive)?;
     storage::version_record(env, policy_id, version).ok_or(ContractError::VersionNotFound)
 }

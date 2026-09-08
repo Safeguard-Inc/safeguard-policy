@@ -9,7 +9,12 @@ use std::path::Path;
 
 use crate::error::ContractError;
 use crate::evaluate::{EvaluationInput, EvaluationResult};
-use crate::storage::{Id, RuleRecord};
+use crate::storage::RuleRecord;
+
+/// Test-local alias: the contract now spells 32-byte ids as [`BytesN::<32>`]
+/// inline (type aliases emit a dangling `Udt` reference in the on-chain
+/// spec, which breaks CLI invocation), but tests keep the short name.
+type Id = BytesN<32>;
 use crate::{PolicyContract, PolicyContractClient};
 
 use safeguard_sdk::model::PolicyDocument;

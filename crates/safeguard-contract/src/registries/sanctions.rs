@@ -7,11 +7,11 @@
 //! stays readable. Adapters push dataset updates through the registry
 //! authority role; reads are public so hooks and audit can screen and verify.
 
-use soroban_sdk::{Address, Bytes, Env};
+use soroban_sdk::{Address, Bytes, BytesN, Env};
 
 use crate::admin;
 use crate::error::ContractError;
-use crate::storage::{self, Id, SanctionsEntryRecord};
+use crate::storage::{self, SanctionsEntryRecord};
 
 use safeguard_core::registries::sanctions::SanctionsStatus;
 
@@ -24,8 +24,8 @@ use safeguard_core::registries::sanctions::SanctionsStatus;
 pub fn set_sanctions_entry(
     env: &Env,
     operator: &Address,
-    subject_hash: &Id,
-    list_id: &Id,
+    subject_hash: &BytesN<32>,
+    list_id: &BytesN<32>,
     status: u32,
     dataset_version: u32,
     effective_at: u64,
@@ -60,7 +60,7 @@ pub fn set_sanctions_entry(
 pub fn retire_sanctions_entry(
     env: &Env,
     operator: &Address,
-    subject_hash: &Id,
+    subject_hash: &BytesN<32>,
 ) -> Result<(), ContractError> {
     admin::require_admin_or_authority(env, operator)?;
 
@@ -74,6 +74,6 @@ pub fn retire_sanctions_entry(
 }
 
 /// Read a subject's sanctions entry (public).
-pub fn sanctions_entry(env: &Env, subject_hash: &Id) -> Option<SanctionsEntryRecord> {
+pub fn sanctions_entry(env: &Env, subject_hash: &BytesN<32>) -> Option<SanctionsEntryRecord> {
     storage::sanctions_entry(env, subject_hash)
 }

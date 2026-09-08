@@ -8,22 +8,20 @@
 //! Note the boundary: **transfer-level** events (`transfer_approved`,
 //! `transfer_blocked`) belong to `safeguard-hooks`, not here.
 
-use soroban_sdk::{contractevent, Address, Env};
-
-use crate::storage::Id;
+use soroban_sdk::{contractevent, Address, BytesN, Env};
 
 /// A token was bound to a policy's scope (which tokens a policy governs is
 /// itself compliance configuration, so the change must be provable).
 #[contractevent]
 pub struct TokenBound {
     #[topic]
-    pub policy_id: Id,
+    pub policy_id: BytesN<32>,
     #[topic]
     pub token: Address,
 }
 
 /// Publish a policy↔token binding.
-pub fn token_bound(env: &Env, policy_id: &Id, token: &Address) {
+pub fn token_bound(env: &Env, policy_id: &BytesN<32>, token: &Address) {
     TokenBound {
         policy_id: policy_id.clone(),
         token: token.clone(),
@@ -35,13 +33,13 @@ pub fn token_bound(env: &Env, policy_id: &Id, token: &Address) {
 #[contractevent]
 pub struct TokenUnbound {
     #[topic]
-    pub policy_id: Id,
+    pub policy_id: BytesN<32>,
     #[topic]
     pub token: Address,
 }
 
 /// Publish a policy↔token unbinding.
-pub fn token_unbound(env: &Env, policy_id: &Id, token: &Address) {
+pub fn token_unbound(env: &Env, policy_id: &BytesN<32>, token: &Address) {
     TokenUnbound {
         policy_id: policy_id.clone(),
         token: token.clone(),
@@ -77,9 +75,9 @@ pub fn admin_set(env: &Env, admin: &Address) {
 #[contractevent]
 pub struct PolicyCreated {
     #[topic]
-    pub policy_id: Id,
+    pub policy_id: BytesN<32>,
     pub version: u32,
-    pub config_hash: Id,
+    pub config_hash: BytesN<32>,
 }
 
 /// One rule was registered as part of a policy version.
@@ -90,11 +88,11 @@ pub struct PolicyCreated {
 #[contractevent]
 pub struct RuleRegistered {
     #[topic]
-    pub policy_id: Id,
+    pub policy_id: BytesN<32>,
     #[topic]
     pub version: u32,
     #[topic]
-    pub rule_id: Id,
+    pub rule_id: BytesN<32>,
     pub rule_type: u32,
     pub action: u32,
 }
@@ -102,9 +100,9 @@ pub struct RuleRegistered {
 /// Publish a rule registration for a version.
 pub fn rule_registered(
     env: &Env,
-    policy_id: &Id,
+    policy_id: &BytesN<32>,
     version: u32,
-    rule_id: &Id,
+    rule_id: &BytesN<32>,
     rule_type: u32,
     action: u32,
 ) {
@@ -123,9 +121,9 @@ pub fn rule_registered(
 #[contractevent]
 pub struct PolicyActivated {
     #[topic]
-    pub policy_id: Id,
+    pub policy_id: BytesN<32>,
     pub version: u32,
-    pub config_hash: Id,
+    pub config_hash: BytesN<32>,
 }
 
 /// The active version of a policy was deactivated (policy now has no active
@@ -133,7 +131,7 @@ pub struct PolicyActivated {
 #[contractevent]
 pub struct PolicyDeactivated {
     #[topic]
-    pub policy_id: Id,
+    pub policy_id: BytesN<32>,
     pub version: u32,
 }
 
@@ -147,7 +145,7 @@ pub struct IdentityUpdated {
     #[topic]
     pub account: Address,
     pub status: u32,
-    pub attestation_ref: Id,
+    pub attestation_ref: BytesN<32>,
     pub expires_at: u64,
 }
 
@@ -183,7 +181,7 @@ pub fn identity_removed(env: &Env, account: &Address) {
 #[contractevent]
 pub struct SanctionsEntryUpdated {
     #[topic]
-    pub subject_hash: Id,
+    pub subject_hash: BytesN<32>,
     pub status: u32,
     pub dataset_version: u32,
 }
@@ -191,7 +189,7 @@ pub struct SanctionsEntryUpdated {
 /// Publish a sanctions entry write/replace/retire.
 pub fn sanctions_entry_updated(
     env: &Env,
-    subject_hash: &Id,
+    subject_hash: &BytesN<32>,
     record: &crate::storage::SanctionsEntryRecord,
 ) {
     SanctionsEntryUpdated {

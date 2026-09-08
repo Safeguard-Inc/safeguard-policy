@@ -33,14 +33,11 @@ pub const TTL_EXTEND_TO: u32 = 5_000_000;
 /// Entries are only extended when their remaining TTL is below this.
 pub const TTL_THRESHOLD: u32 = 500_000;
 
-/// A policy id or rule id as fixed 32 bytes.
-pub type Id = BytesN<32>;
-
 /// Composite key for one policy version's record.
 #[contracttype]
 #[derive(Clone)]
 pub struct VersionKey {
-    pub policy_id: Id,
+    pub policy_id: BytesN<32>,
     pub version: u32,
 }
 
@@ -57,13 +54,13 @@ pub enum DataKey {
     /// persistent: configuration record of a policy version.
     Version(VersionKey),
     /// persistent: the active version number of a policy.
-    ActiveVersion(Id),
+    ActiveVersion(BytesN<32>),
     /// persistent: tokens covered by a policy.
-    TokenBindings(Id),
+    TokenBindings(BytesN<32>),
     /// persistent: identity verification record of an account.
     Identity(Address),
     /// persistent: normalized sanctions entry, keyed by subject hash.
-    SanctionsEntry(Id),
+    SanctionsEntry(BytesN<32>),
     /// persistent: jurisdiction classification of an account.
     Jurisdiction(Address),
 }
@@ -72,7 +69,7 @@ pub enum DataKey {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RuleRecord {
-    pub rule_id: Id,
+    pub rule_id: BytesN<32>,
     pub rule_type: u32,
     pub action: u32,
 }
@@ -81,12 +78,12 @@ pub struct RuleRecord {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PolicyVersionRecord {
-    pub policy_id: Id,
+    pub policy_id: BytesN<32>,
     pub version: u32,
     /// [`safeguard_core::version::VersionStatus`] code.
     pub status: u32,
     /// Config hash (sha-256 of the serialized rule set).
-    pub config_hash: Id,
+    pub config_hash: BytesN<32>,
     pub rules: Vec<RuleRecord>,
 }
 
@@ -100,7 +97,7 @@ pub struct IdentityRecord {
     /// [`safeguard_core::registries::identity::IdentityStatus`] code.
     pub status: u32,
     /// Reference/hash of the backing attestation (32-byte id width).
-    pub attestation_ref: Id,
+    pub attestation_ref: BytesN<32>,
     /// Ledger timestamp at which the attestation expires (0 = never).
     pub expires_at: u64,
 }
@@ -114,7 +111,7 @@ pub struct IdentityRecord {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SanctionsEntryRecord {
     /// Source list identifier (e.g. `OFAC-SDN`), 32-byte id width.
-    pub list_id: Id,
+    pub list_id: BytesN<32>,
     /// [`safeguard_core::registries::sanctions::SanctionsStatus`] code.
     pub status: u32,
     /// Monotonic version of the dataset this entry belongs to.
@@ -193,7 +190,11 @@ fn get_persistent<T: TryFromVal<Env, Val>>(env: &Env, key: &DataKey) -> Option<T
     value
 }
 
-pub fn version_record(env: &Env, policy_id: &Id, version: u32) -> Option<PolicyVersionRecord> {
+pub fn version_record(
+    env: &Env,
+    policy_id: &BytesN<32>,
+    version: u32,
+) -> Option<PolicyVersionRecord> {
     get_persistent(
         env,
         &DataKey::Version(VersionKey {
@@ -214,25 +215,25 @@ pub fn set_version_record(env: &Env, record: &PolicyVersionRecord) {
     );
 }
 
-pub fn active_version(env: &Env, policy_id: &Id) -> Option<u32> {
+pub fn active_version(env: &Env, policy_id: &BytesN<32>) -> Option<u32> {
     get_persistent(env, &DataKey::ActiveVersion(policy_id.clone()))
 }
 
-pub fn set_active_version(env: &Env, policy_id: &Id, version: u32) {
+pub fn set_active_version(env: &Env, policy_id: &BytesN<32>, version: u32) {
     set_persistent(env, &DataKey::ActiveVersion(policy_id.clone()), &version);
 }
 
-pub fn clear_active_version(env: &Env, policy_id: &Id) {
+pub fn clear_active_version(env: &Env, policy_id: &BytesN<32>) {
     env.storage()
         .persistent()
         .remove(&DataKey::ActiveVersion(policy_id.clone()));
 }
 
-pub fn token_bindings(env: &Env, policy_id: &Id) -> Vec<Address> {
+pub fn token_bindings(env: &Env, policy_id: &BytesN<32>) -> Vec<Address> {
     get_persistent(env, &DataKey::TokenBindings(policy_id.clone())).unwrap_or_else(|| vec![env])
 }
 
-pub fn set_token_bindings(env: &Env, policy_id: &Id, tokens: &Vec<Address>) {
+pub fn set_token_bindings(env: &Env, policy_id: &BytesN<32>, tokens: &Vec<Address>) {
     set_persistent(env, &DataKey::TokenBindings(policy_id.clone()), tokens);
 }
 
@@ -252,11 +253,11 @@ pub fn remove_identity_record(env: &Env, account: &Address) {
         .remove(&DataKey::Identity(account.clone()));
 }
 
-pub fn sanctions_entry(env: &Env, subject_hash: &Id) -> Option<SanctionsEntryRecord> {
+pub fn sanctions_entry(env: &Env, subject_hash: &BytesN<32>) -> Option<SanctionsEntryRecord> {
     get_persistent(env, &DataKey::SanctionsEntry(subject_hash.clone()))
 }
 
-pub fn set_sanctions_entry(env: &Env, subject_hash: &Id, record: &SanctionsEntryRecord) {
+pub fn set_sanctions_entry(env: &Env, subject_hash: &BytesN<32>, record: &SanctionsEntryRecord) {
     set_persistent(env, &DataKey::SanctionsEntry(subject_hash.clone()), record);
 }
 

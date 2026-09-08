@@ -14,11 +14,11 @@
 //! Binding management requires the admin or a registry authority. Reads are
 //! public so hooks and audit tooling can resolve coverage.
 
-use soroban_sdk::{Address, Env, Vec};
+use soroban_sdk::{Address, BytesN, Env, Vec};
 
 use crate::admin;
 use crate::error::ContractError;
-use crate::storage::{self, Id};
+use crate::storage::{self};
 
 /// Bind a token to a policy. Admin or registry authority. Idempotent.
 ///
@@ -28,7 +28,7 @@ use crate::storage::{self, Id};
 pub fn bind_token(
     env: &Env,
     operator: &Address,
-    policy_id: &Id,
+    policy_id: &BytesN<32>,
     token: &Address,
 ) -> Result<(), ContractError> {
     admin::require_admin_or_authority(env, operator)?;
@@ -50,7 +50,7 @@ pub fn bind_token(
 pub fn unbind_token(
     env: &Env,
     operator: &Address,
-    policy_id: &Id,
+    policy_id: &BytesN<32>,
     token: &Address,
 ) -> Result<(), ContractError> {
     admin::require_admin_or_authority(env, operator)?;
@@ -73,11 +73,11 @@ pub fn unbind_token(
 }
 
 /// The tokens currently bound to a policy (public read).
-pub fn bound_tokens(env: &Env, policy_id: &Id) -> Vec<Address> {
+pub fn bound_tokens(env: &Env, policy_id: &BytesN<32>) -> Vec<Address> {
     storage::token_bindings(env, policy_id)
 }
 
 /// Whether a token is bound to a policy.
-pub fn is_bound(env: &Env, policy_id: &Id, token: &Address) -> bool {
+pub fn is_bound(env: &Env, policy_id: &BytesN<32>, token: &Address) -> bool {
     storage::token_bindings(env, policy_id).contains(token)
 }

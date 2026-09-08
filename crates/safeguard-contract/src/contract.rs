@@ -12,7 +12,7 @@
 //! * `evaluate` — see [`crate::registry`] for request assembly and
 //!   [`safeguard-core::evaluator`] for the decision itself
 
-use soroban_sdk::{contract, contractimpl, Address, Env, Vec};
+use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
 
 use crate::admin;
 use crate::error::ContractError;
@@ -20,7 +20,7 @@ use crate::evaluate::{self, EvaluationInput, EvaluationResult};
 use crate::lifecycle;
 use crate::registries::{identity, jurisdiction, sanctions};
 use crate::registry;
-use crate::storage::{Id, IdentityRecord, PolicyVersionRecord, RuleRecord, SanctionsEntryRecord};
+use crate::storage::{IdentityRecord, PolicyVersionRecord, RuleRecord, SanctionsEntryRecord};
 
 #[contract]
 pub struct PolicyContract;
@@ -89,9 +89,9 @@ impl PolicyContract {
     /// Register a new draft version of a policy. Admin only; append-only.
     pub fn register_version(
         env: Env,
-        policy_id: Id,
+        policy_id: BytesN<32>,
         version: u32,
-        config_hash: Id,
+        config_hash: BytesN<32>,
         rules: Vec<RuleRecord>,
     ) -> Result<(), ContractError> {
         lifecycle::register_version(&env, &policy_id, version, &config_hash, &rules)
@@ -102,7 +102,7 @@ impl PolicyContract {
     pub fn activate_version(
         env: Env,
         operator: Address,
-        policy_id: Id,
+        policy_id: BytesN<32>,
         version: u32,
     ) -> Result<(), ContractError> {
         lifecycle::activate_version(&env, &operator, &policy_id, version)
@@ -112,7 +112,7 @@ impl PolicyContract {
     pub fn deactivate_version(
         env: Env,
         operator: Address,
-        policy_id: Id,
+        policy_id: BytesN<32>,
         version: u32,
     ) -> Result<(), ContractError> {
         lifecycle::deactivate_version(&env, &operator, &policy_id, version)
@@ -121,7 +121,7 @@ impl PolicyContract {
     /// The record of a specific policy version (public read).
     pub fn get_version(
         env: Env,
-        policy_id: Id,
+        policy_id: BytesN<32>,
         version: u32,
     ) -> Result<PolicyVersionRecord, ContractError> {
         lifecycle::get_version(&env, &policy_id, version)
@@ -130,7 +130,7 @@ impl PolicyContract {
     /// The record of the active version of a policy (public read).
     pub fn get_active_version(
         env: Env,
-        policy_id: Id,
+        policy_id: BytesN<32>,
     ) -> Result<PolicyVersionRecord, ContractError> {
         lifecycle::get_active_version(&env, &policy_id)
     }
@@ -141,7 +141,7 @@ impl PolicyContract {
     pub fn bind_token(
         env: Env,
         operator: Address,
-        policy_id: Id,
+        policy_id: BytesN<32>,
         token: Address,
     ) -> Result<(), ContractError> {
         registry::bind_token(&env, &operator, &policy_id, &token)
@@ -151,14 +151,14 @@ impl PolicyContract {
     pub fn unbind_token(
         env: Env,
         operator: Address,
-        policy_id: Id,
+        policy_id: BytesN<32>,
         token: Address,
     ) -> Result<(), ContractError> {
         registry::unbind_token(&env, &operator, &policy_id, &token)
     }
 
     /// The tokens bound to a policy (public read).
-    pub fn bound_tokens(env: Env, policy_id: Id) -> Vec<Address> {
+    pub fn bound_tokens(env: Env, policy_id: BytesN<32>) -> Vec<Address> {
         registry::bound_tokens(&env, &policy_id)
     }
 
@@ -171,7 +171,7 @@ impl PolicyContract {
         operator: Address,
         account: Address,
         status: u32,
-        attestation_ref: Id,
+        attestation_ref: BytesN<32>,
         expires_at: u64,
     ) -> Result<(), ContractError> {
         identity::set_identity(
@@ -205,8 +205,8 @@ impl PolicyContract {
     pub fn set_sanctions_entry(
         env: Env,
         operator: Address,
-        subject_hash: Id,
-        list_id: Id,
+        subject_hash: BytesN<32>,
+        list_id: BytesN<32>,
         status: u32,
         dataset_version: u32,
         effective_at: u64,
@@ -229,13 +229,13 @@ impl PolicyContract {
     pub fn retire_sanctions_entry(
         env: Env,
         operator: Address,
-        subject_hash: Id,
+        subject_hash: BytesN<32>,
     ) -> Result<(), ContractError> {
         sanctions::retire_sanctions_entry(&env, &operator, &subject_hash)
     }
 
     /// A subject's sanctions entry (public read).
-    pub fn sanctions_entry(env: Env, subject_hash: Id) -> Option<SanctionsEntryRecord> {
+    pub fn sanctions_entry(env: Env, subject_hash: BytesN<32>) -> Option<SanctionsEntryRecord> {
         sanctions::sanctions_entry(&env, &subject_hash)
     }
 
@@ -274,7 +274,7 @@ impl PolicyContract {
     /// configuration from the active policy version and returns the decision.
     pub fn evaluate(
         env: Env,
-        policy_id: Id,
+        policy_id: BytesN<32>,
         token: Address,
         input: EvaluationInput,
     ) -> Result<EvaluationResult, ContractError> {

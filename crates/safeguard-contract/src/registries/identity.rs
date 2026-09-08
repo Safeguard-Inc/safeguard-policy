@@ -6,11 +6,11 @@
 //! KYC/attestation providers push updates through the registry authority
 //! role; reads are public.
 
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{Address, BytesN, Env};
 
 use crate::admin;
 use crate::error::ContractError;
-use crate::storage::{self, Id, IdentityRecord};
+use crate::storage::{self, IdentityRecord};
 
 use safeguard_core::registries::identity::IdentityStatus;
 
@@ -23,7 +23,7 @@ pub fn set_identity(
     operator: &Address,
     account: &Address,
     status: u32,
-    attestation_ref: Id,
+    attestation_ref: BytesN<32>,
     expires_at: u64,
 ) -> Result<(), ContractError> {
     admin::require_admin_or_authority(env, operator)?;

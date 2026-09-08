@@ -26,7 +26,7 @@ use soroban_sdk::{contracttype, Address, BytesN, Env};
 
 use crate::error::ContractError;
 use crate::registry;
-use crate::storage::{self, Id, PolicyVersionRecord};
+use crate::storage::{self, PolicyVersionRecord};
 
 use safeguard_core::decision::PolicyDecision;
 use safeguard_core::evaluation::{
@@ -69,7 +69,7 @@ pub struct EvaluationInput {
     /// [`Self::account`].
     pub jurisdiction: u32,
     /// 32-byte subject reference (hash) used for sanctions-registry lookup.
-    pub subject: Id,
+    pub subject: BytesN<32>,
     /// The transacting account, used for jurisdiction-registry lookup.
     pub account: Address,
 }
@@ -85,7 +85,7 @@ pub struct EvaluationResult {
     /// [`safeguard_core::decision::ReasonCode`] code.
     pub reason_code: u32,
     /// The rule that triggered the outcome, when a rule produced it.
-    pub rule_id: Option<Id>,
+    pub rule_id: Option<BytesN<32>>,
 }
 
 /// Decode an account status code, fail-closed on unknown values.
@@ -212,7 +212,7 @@ fn to_result(env: &Env, policy_version: u32, decision: PolicyDecision) -> Evalua
 /// the returned decision expresses.
 pub fn evaluate(
     env: &Env,
-    policy_id: &Id,
+    policy_id: &BytesN<32>,
     token: &Address,
     input: &EvaluationInput,
 ) -> Result<EvaluationResult, ContractError> {
