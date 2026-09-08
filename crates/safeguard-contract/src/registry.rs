@@ -21,6 +21,10 @@ use crate::error::ContractError;
 use crate::storage::{self, Id};
 
 /// Bind a token to a policy. Admin or registry authority. Idempotent.
+///
+/// Publishes a [`crate::events::TokenBound`] event on a real change, so
+/// audit can prove which tokens a policy governed at any point in time;
+/// re-binding an already-bound token is a no-op that emits nothing.
 pub fn bind_token(
     env: &Env,
     operator: &Address,
@@ -33,11 +37,16 @@ pub fn bind_token(
     if !tokens.contains(token) {
         tokens.push_back(token.clone());
         storage::set_token_bindings(env, policy_id, &tokens);
+        crate::events::token_bound(env, policy_id, token);
     }
     Ok(())
 }
 
 /// Unbind a token from a policy. Admin or registry authority. Idempotent.
+///
+/// Publishes a [`crate::events::TokenUnbound`] event when a token was
+/// actually removed; unbinding a token outside the policy's scope is a
+/// no-op that emits nothing.
 pub fn unbind_token(
     env: &Env,
     operator: &Address,
@@ -48,12 +57,18 @@ pub fn unbind_token(
 
     let tokens = storage::token_bindings(env, policy_id);
     let mut remaining: Vec<Address> = Vec::new(env);
+    let mut removed = false;
     for entry in tokens.iter() {
         if &entry != token {
             remaining.push_back(entry);
+        } else {
+            removed = true;
         }
     }
-    storage::set_token_bindings(env, policy_id, &remaining);
+    if removed {
+        storage::set_token_bindings(env, policy_id, &remaining);
+        crate::events::token_unbound(env, policy_id, token);
+    }
     Ok(())
 }
 

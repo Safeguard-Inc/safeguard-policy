@@ -12,6 +12,43 @@ use soroban_sdk::{contractevent, Address, Env};
 
 use crate::storage::Id;
 
+/// A token was bound to a policy's scope (which tokens a policy governs is
+/// itself compliance configuration, so the change must be provable).
+#[contractevent]
+pub struct TokenBound {
+    #[topic]
+    pub policy_id: Id,
+    #[topic]
+    pub token: Address,
+}
+
+/// Publish a policy↔token binding.
+pub fn token_bound(env: &Env, policy_id: &Id, token: &Address) {
+    TokenBound {
+        policy_id: policy_id.clone(),
+        token: token.clone(),
+    }
+    .publish(env);
+}
+
+/// A token was unbound from a policy's scope.
+#[contractevent]
+pub struct TokenUnbound {
+    #[topic]
+    pub policy_id: Id,
+    #[topic]
+    pub token: Address,
+}
+
+/// Publish a policy↔token unbinding.
+pub fn token_unbound(env: &Env, policy_id: &Id, token: &Address) {
+    TokenUnbound {
+        policy_id: policy_id.clone(),
+        token: token.clone(),
+    }
+    .publish(env);
+}
+
 /// The administrative authority was recorded or replaced.
 ///
 /// Emitted on `initialize` (the genesis admin) and on every real `set_admin`

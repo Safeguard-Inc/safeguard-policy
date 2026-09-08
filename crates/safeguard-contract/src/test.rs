@@ -600,6 +600,62 @@ fn scope_guards_refuse_evaluation_outside_the_policy() {
     assert_approve(&client.evaluate(&policy, &token, &active_input(&env, &admin)));
 }
 
+/// Policy↔token bindings publish one event each on a real change — and
+/// nothing on idempotent repeats — so audit can prove which tokens a policy
+/// governed at any point in time.
+#[test]
+fn token_bindings_publish_events_only_on_real_changes() {
+    use soroban_sdk::xdr::ContractEventBody;
+    use soroban_sdk::Symbol;
+    use soroban_sdk::TryFromVal as _;
+
+    fn event_topics(env: &Env, event: &soroban_sdk::xdr::ContractEvent) -> (Symbol, Id, Address) {
+        let ContractEventBody::V0(v0) = &event.body;
+        let name: Symbol = Symbol::try_from_val(env, &v0.topics[0]).expect("symbol topic");
+        let policy: Id = Id::try_from_val(env, &v0.topics[1]).expect("id topic");
+        let token: Address = Address::try_from_val(env, &v0.topics[2]).expect("address topic");
+        (name, policy, token)
+    }
+
+    let env = Env::default();
+    let (admin, _, _, token, policy, client) = setup(&env);
+
+    // Binding publishes one TokenBound naming the policy and the token.
+    client.bind_token(&admin, &policy, &token);
+    let all_events = env.events().all();
+    assert_eq!(all_events.events().len(), 1);
+    assert_eq!(
+        event_topics(&env, &all_events.events()[0]),
+        (
+            Symbol::new(&env, "token_bound"),
+            policy.clone(),
+            token.clone()
+        )
+    );
+
+    // Re-binding the same token is a no-op: no event.
+    client.bind_token(&admin, &policy, &token);
+    assert_eq!(env.events().all().events().len(), 0);
+
+    // Unbinding publishes one TokenUnbound naming the same pair.
+    client.unbind_token(&admin, &policy, &token);
+    let all_events = env.events().all();
+    assert_eq!(all_events.events().len(), 1);
+    assert_eq!(
+        event_topics(&env, &all_events.events()[0]),
+        (
+            Symbol::new(&env, "token_unbound"),
+            policy.clone(),
+            token.clone()
+        )
+    );
+    assert_eq!(client.bound_tokens(&policy), Vec::new(&env));
+
+    // Unbinding a token outside scope is a no-op: no event.
+    client.unbind_token(&admin, &policy, &token);
+    assert_eq!(env.events().all().events().len(), 0);
+}
+
 // -------------------------------------------------------------- registries
 
 /// Register + activate a version with a blocking jurisdiction rule and bind

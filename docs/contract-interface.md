@@ -48,8 +48,8 @@ to transfers but not to mints") belongs to `safeguard-hooks`, which decides
 
 | Function | Auth | Description |
 | -------- | ---- | ----------- |
-| `bind_token(operator, policy_id, token)` | admin or authority | Add a token to a policy's scope. Idempotent. Unauthorized operators get `Unauthorized`. |
-| `unbind_token(operator, policy_id, token)` | admin or authority | Remove a token from a policy's scope. Idempotent. |
+| `bind_token(operator, policy_id, token)` | admin or authority | Add a token to a policy's scope, emitting `token_bound`. Idempotent. Unauthorized operators get `Unauthorized`. |
+| `unbind_token(operator, policy_id, token)` | admin or authority | Remove a token from a policy's scope, emitting `token_unbound`. Idempotent. |
 | `bound_tokens(policy_id) -> Vec<Address>` | public | List tokens covered by a policy. |
 
 ### Compliance registries
@@ -137,6 +137,8 @@ Typed `contractevent`s published by the lifecycle and registries:
 | Event | Payload |
 | ----- | ------- |
 | `admin_set` | admin |
+| `token_bound` | policy_id, token |
+| `token_unbound` | policy_id, token |
 | `policy_created` | policy_id, version, config_hash |
 | `policy_activated` | policy_id, version, config_hash |
 | `policy_deactivated` | policy_id, version |
@@ -152,8 +154,11 @@ Typed `contractevent`s published by the lifecycle and registries:
 
 These are the **configuration-change** events audit consumes: `admin_set`
 proves who held the administrator role at any point (genesis on
-`initialize`, the successor on every real `set_admin`); the
-`registry_updated` family covers compliance-data mutations; and the
+`initialize`, the successor on every real `set_admin`);
+`token_bound`/`token_unbound` prove which tokens a policy governed at any
+point (the same guarantee the hooks polyrepo's binding events give the
+enforcement layer); the `registry_updated` family covers compliance-data
+mutations; and the
 `authority_added`/`authority_removed` pair is the
 `registry_authority_changed` family proving who held the registry-authority
 role when. The `policy_authority_added`/`policy_authority_removed` pair does
