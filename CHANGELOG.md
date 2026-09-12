@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — enforcement-wire hardening
+
+- **Identity expiry enforced on the wire** — `is_authorized` now degrades an
+  identity record with an elapsed `expires_at` to `Unknown` (fail closed →
+  deny); `expires_at == 0` retains its "no expiry" meaning. Documented in
+  `docs/contract-interface.md` and `docs/registries.md`.
+- **Error-code table pinned** — a new exhaustive-match test fails CI when a
+  `ContractError` variant and the code table in `docs/contract-interface.md`
+  drift apart, keeping the documented on-chain surface complete.
+
+### Changed — CI and supply chain
+
+- **Security workflow on main** — cargo-deny and npm-audit now also run on
+  every push to `main` (previously only dependency-touching PRs and the
+  nightly schedule), matching the sibling polyrepos.
+- **cargo-deny-action aligned** — pinned to the same action SHA as
+  `safeguard-audit` and `safeguard-hooks` (dependabot #9).
+- **Artifact actions bumped as a pair** — `actions/upload-artifact` v7.0.1
+  and `actions/download-artifact` v8.0.1 together, so the release artifact
+  handoff stays version-consistent (dependabot #10, #11).
+- **Least-privilege release** — `release.yml` runs `contents:read` at the
+  workflow level; only the release-publishing job holds `contents:write`, so
+  a compromised gate/build/registry step cannot mutate the repository.
+
 ### Added — governance and hardening
 
 - **CODEOWNERS** — every change has a named reviewer.
