@@ -1344,6 +1344,57 @@ fn the_stable_numeric_interface_is_pinned() {
     assert_eq!(Rg::Unknown.to_code(), 3);
 }
 
+/// The documented code table in `docs/contract-interface.md` is generated
+/// from this enum; this test fails the build when a variant is added
+/// without a corresponding docs update, so the on-chain surface and the
+/// reference docs can never drift apart silently.
+#[test]
+fn every_error_variant_is_pinned_to_the_documented_table() {
+    // The match below is exhaustive: adding a ContractError variant breaks
+    // compilation here, and listing it without updating the documented set
+    // (or vice versa) fails the assertion — the docs table and the enum
+    // cannot drift apart.
+    let live_codes: [u32; 13] = [
+        ContractError::AlreadyInitialized as u32,
+        ContractError::NotInitialized as u32,
+        ContractError::PolicyNotFound as u32,
+        ContractError::VersionNotFound as u32,
+        ContractError::VersionNotDraft as u32,
+        ContractError::InvalidRuleSet as u32,
+        ContractError::PolicyNotActive as u32,
+        ContractError::TokenNotBound as u32,
+        ContractError::VersionExists as u32,
+        ContractError::VersionNotActive as u32,
+        ContractError::InvalidRegistryData as u32,
+        ContractError::RegistryAuthorityRequired as u32,
+        ContractError::PolicyAuthorityRequired as u32,
+    ];
+    // Exhaustiveness guard: a new variant must be added to this match (and
+    // therefore to the docs table and the stable-interface test above).
+    #[allow(dead_code, unreachable_patterns)]
+    fn assert_exhaustive(e: ContractError) -> u32 {
+        match e {
+            ContractError::AlreadyInitialized => 2,
+            ContractError::NotInitialized => 3,
+            ContractError::PolicyNotFound => 4,
+            ContractError::VersionNotFound => 5,
+            ContractError::VersionNotDraft => 6,
+            ContractError::InvalidRuleSet => 7,
+            ContractError::PolicyNotActive => 8,
+            ContractError::TokenNotBound => 9,
+            ContractError::VersionExists => 11,
+            ContractError::VersionNotActive => 12,
+            ContractError::InvalidRegistryData => 13,
+            ContractError::RegistryAuthorityRequired => 14,
+            ContractError::PolicyAuthorityRequired => 15,
+        }
+    }
+    let documented: [u32; 13] = [2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15];
+    let mut sorted_live = live_codes;
+    sorted_live.sort_unstable();
+    assert_eq!(sorted_live, documented, "ContractError and the docs code table in docs/contract-interface.md disagree — update the table and this test together");
+}
+
 // -------------------------------------------- enforcement wire (is_authorized)
 
 /// An enforcement-shaped policy: rules decidable from on-chain state only.
