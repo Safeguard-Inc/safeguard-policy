@@ -1,6 +1,8 @@
 name: Security
 
 on:
+  push:
+    branches: [main]
   schedule:
     # Nightly dependency-advisory sweep (cargo-deny and npm audit fetch the
     # latest advisory databases).
