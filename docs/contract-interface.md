@@ -60,7 +60,7 @@ authority, reads are public.
 
 | Function | Auth | Description |
 | -------- | ---- | ----------- |
-| `set_identity(operator, account, status, attestation_ref, expires_at)` | admin or authority | Write/replace an account's verification record. Unknown status codes fail `InvalidRegistryData`. |
+| `set_identity(operator, account, status, attestation_ref, expires_at)` | admin or authority | Write/replace an account's verification record. Unknown status codes fail `InvalidRegistryData`. `expires_at` is a ledger-seconds epoch after which `is_authorized` treats the record as `Unknown` (fail closed); `0` means no expiry. |
 | `remove_identity(operator, account)` | admin or authority | Remove an account's verification record. |
 | `identity(account) -> Option<IdentityRecord>` | public | Read the stored record. |
 | `set_sanctions_entry(operator, subject_hash, list_id, status, dataset_version, effective_at, source)` | admin or authority | Upsert a normalized entry. Status must be a known `SanctionsStatus` and `dataset_version >= 1`. |
@@ -89,8 +89,11 @@ token) -> bool` wire function the `safeguard-hooks` policy-client calls
 account and a token, so the decision is derived exclusively from this
 contract's on-chain state: the policy governing the token (resolved through
 the registry's reverse index, and required to be bound and active), the
-account's identity record (an account with no record is `Unknown` → denied),
-and the sanctions/jurisdiction registries via the same override as
+account's identity record (an account with no record is `Unknown` → denied;
+an account whose record carries an **elapsed `expires_at` is likewise
+`Unknown` → denied** — a verification with a stated lifetime ends when that
+lifetime ends, and only `expires_at == 0` means "no expiry"), and the
+sanctions/jurisdiction registries via the same override as
 `evaluate`. Allowlist/denylist/sanctions *membership* are caller-supplied
 facts in the richer `evaluate` flow and are treated as absent here — a
 deployment wiring ENFORCE to this contract must use a rule set decidable

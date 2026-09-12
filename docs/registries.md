@@ -27,7 +27,7 @@ passed in as a resolved fact by the caller (hooks).
 
 | Registry | Holds | Current state |
 | -------- | ----- | ------------- |
-| Identity | Account → verification status, attestation reference, expiry. No PII: references, hashes, provider ids. | **On-chain today**: `set_identity` / `remove_identity` / `identity` (admin or registry authority). Read by hooks/audit; verification status is not an engine input. |
+| Identity | Account → verification status, attestation reference, expiry. No PII: references, hashes, provider ids. | **On-chain today**: `set_identity` / `remove_identity` / `identity` (admin or registry authority). Read by hooks/audit; verification status is not an engine input. On the enforcement wire an **elapsed `expires_at`** degrades the record to `Unknown` (fail closed → deny); `0` means no expiry. `evaluate` callers resolve expiry themselves off-chain, where their clock is authoritative. |
 | Sanctions | Subject hash, list id, status, dataset version, effective time, source. | **On-chain today**: `set_sanctions_entry` / `retire_sanctions_entry` / `sanctions_entry` plus `evaluate` resolution — an active entry for the subject hash makes the sanctions rule fire regardless of the caller's claim. |
 | Jurisdiction | Account → region code. | **On-chain today**: `set_jurisdiction` / `clear_jurisdiction` / `jurisdiction` plus `evaluate` resolution — a stored classification wins over the caller's claim. |
 | Token | Policy → bound Confidential Tokens. | **On-chain today**: `bind_token` / `unbind_token` / `bound_tokens`. `evaluate` refuses unbound tokens. |
