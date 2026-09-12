@@ -1491,3 +1491,49 @@ fn is_authorized_consults_the_on_chain_sanctions_registry() {
     client.retire_sanctions_entry(&admin, &subject);
     assert!(client.is_authorized(&alice, &token));
 }
+
+#[test]
+fn is_authorized_treats_an_expired_identity_as_unknown() {
+    use soroban_sdk::testutils::Ledger as _;
+
+    let env = Env::default();
+    let (admin, _, _, token, policy, client) = setup(&env);
+    register_enforcement_policy(&env, &client, &policy, 1);
+    client.activate_version(&admin, &policy, &1);
+    client.bind_token(&admin, &policy, &token);
+
+    let alice = Address::generate(&env);
+    let verified = AccountStatus::Active.to_code();
+
+    // Zero means "no expiry": permanent until the authority rewrites it.
+    client.set_identity(&admin, &alice, &verified, &config_hash(&env, 7), &0);
+    assert!(client.is_authorized(&alice, &token));
+
+    // A future expiry keeps the record authoritative while it is live.
+    let now = env.ledger().timestamp();
+    client.set_identity(
+        &admin,
+        &alice,
+        &verified,
+        &config_hash(&env, 7),
+        &(now + 1_000),
+    );
+    assert!(client.is_authorized(&alice, &token));
+
+    // The instant the expiry passes, the record degrades to Unknown — the
+    // evaluator flags (review outcome), which the wire answers as a denial.
+    // A stale verification must not keep approving forever.
+    env.ledger().with_mut(|l| l.timestamp = now + 1_000);
+    assert!(!client.is_authorized(&alice, &token));
+
+    // Rewriting the record restores the approval (the expiry is per write,
+    // not per account).
+    client.set_identity(
+        &admin,
+        &alice,
+        &verified,
+        &config_hash(&env, 7),
+        &(now + 5_000),
+    );
+    assert!(client.is_authorized(&alice, &token));
+}

@@ -299,7 +299,14 @@ impl PolicyContract {
     /// * the policy governing `token` is resolved through the registry's
     ///   reverse index and must be bound and active;
     /// * `account`'s status comes from its identity record, and an account
-    ///   with no record is `Unknown` (fail closed);
+    ///   with no record is `Unknown` (fail closed); an account whose record
+    ///   carries an `expires_at` in the past is likewise `Unknown`: a
+    ///   verification with a stated lifetime must not keep approving after
+    ///   that lifetime ends. `expires_at == 0` means no expiry — the status
+    ///   is permanent until the registry authority rewrites it. (Note the
+    ///   ledger timestamp is only available in this env-backed entry point;
+    ///   the pure `evaluate` flow resolves expiry off-chain, where the
+    ///   caller's clock is authoritative.)
     /// * allowlist/denylist/sanctions membership are caller-supplied
     ///   compliance facts in the richer `evaluate` flow and are treated as
     ///   absent here — a deployment wiring ENFORCE to this contract must
@@ -320,10 +327,15 @@ impl PolicyContract {
         };
 
         // The account's structural status: an account with no verification
-        // record is Unknown, which the evaluator flags (fail closed).
-        let account_status = storage::identity_record(&env, &account)
-            .map(|record| record.status)
-            .unwrap_or(AccountStatus::Unknown.to_code());
+        // record is Unknown, which the evaluator flags (fail closed). A
+        // record whose expiry has passed degrades to Unknown as well — an
+        // expired verification must not keep approving on the enforcement
+        // wire. Zero means "no expiry" (see `set_identity`).
+        let account_status = match storage::identity_record(&env, &account) {
+            Some(record) if record.expires_at == 0 => record.status,
+            Some(record) if record.expires_at > env.ledger().timestamp() => record.status,
+            _ => AccountStatus::Unknown.to_code(),
+        };
 
         let input = EvaluationInput {
             account_status,
