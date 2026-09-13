@@ -131,10 +131,13 @@ jobs:
             echo "::notice::CARGO_REGISTRY_TOKEN is not configured — skipping crates.io publishing."
             exit 0
           fi
-          cargo publish -p safeguard-core
-          cargo publish -p safeguard-sdk
-          cargo publish -p safeguard-adapters
-          cargo publish -p safeguard-cli
+          # --locked: publish exactly what the committed lockfile pins. Every
+          # other gate builds --locked; publishing must not quietly resolve
+          # fresh dependency versions that were never built or audited.
+          cargo publish --locked -p safeguard-core
+          cargo publish --locked -p safeguard-sdk
+          cargo publish --locked -p safeguard-adapters
+          cargo publish --locked -p safeguard-cli
 
   publish-npm:
     name: Publish TypeScript SDK to npm
