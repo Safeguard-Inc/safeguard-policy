@@ -2,9 +2,9 @@
   "network": "testnet",
   "rpc_url": "https://soroban-testnet.stellar.org",
   "network_passphrase": "Test SDF Network ; September 2015",
-  "contract_id": "CCOEMBBUNF3WO24YCH637G2TKCFGBN6QMUSUB4ODPLPGF4BUS64WPR47",
+  "contract_id": "CDVME6OPYZO6RAIWRFKLI3ACZHPNZK7GDBIX7YSIER3QLA2SO47QX5IB",
   "admin": {
-    "public_key": "GB3P6MQJIYFNWFQ5SU3PDUWOIBKKS5O7QF5LMIPQ3WQBXSXK4LNFIRO3",
+    "public_key": "GC2U3YSOCCLOHKADJ4INRHJDFVDMGZX3WWTPH7V62MQWETUD4LR4HDCA",
     "secret_key_env": "SAFEGUARD_ADMIN_SK"
   },
   "policies": [
@@ -13,14 +13,14 @@
       "version": 1,
       "status": "active",
       "config_hash": "e13b61ecf84161826403f481e67d25a65d25a67bc85e0323020edf2e479ec9e0",
-      "note": "Shipped default policy (allowlist+denylist+sanctions+jurisdiction). Its allowlist/denylist/sanctions membership are caller-supplied facts in the evaluate(policy_id, token, input) flow."
+      "note": "Shipped default policy (allowlist+denylist+sanctions+jurisdiction). Registered and activated on this deployment; the config_hash below is the one emitted by the live PolicyCreated and PolicyActivated events. Its allowlist/denylist/sanctions membership are caller-supplied facts in the evaluate(policy_id, token, input) flow."
     },
     {
       "policy_id": "enforcement-default",
       "version": 1,
-      "status": "active",
+      "status": "not-registered",
       "config_hash": "e44d5e0b9cbbf0e28b5dac4c9f5f0a32f9c1f1ac1caf9163d1f57b9c1c7c0a0e",
-      "note": "Enforcement-shaped rule set decidable from on-chain state only (no allowlist/denylist/sanctions membership rules); consumed by compliance-hooks through the is_authorized(account, token) wire seam."
+      "note": "Enforcement-shaped rule set decidable from on-chain state only (no allowlist/denylist/sanctions membership rules); consumed by compliance-hooks through the is_authorized(account, token) wire seam. NOT registered on this contract id — only institutional-default was loaded. Register it with scripts/deploy-testnet.sh before pointing an enforcement deployment at it."
     }
   ],
   "bound_tokens": [
@@ -32,8 +32,8 @@
     {
       "policy_id": "enforcement-default",
       "token": "GC2O7PSLQXL24R7EECSMZC7YD5IB7QP5COX2FHC52SVKREEDSX2WWPWV",
-      "note": "Sandbox token address used by the compliance-hooks testnet E2E"
+      "note": "Sandbox token address used by the compliance-hooks testnet E2E. Bound on the safeguard-hooks contract; NOT bound here, so is_authorized(account, this token) answers false (fail-closed) on this contract id."
     }
   ],
-  "description": "Live Testnet deployment verified end-to-end on 2026-09-08. Verified live: evaluate() approves a compliant subject and blocks denylist/sanctions matches; is_authorized(account, token) approves only verified-active accounts on a bound token and answers false for unverified, frozen, suspended, or restricted accounts, unbound tokens, and inactive policies; identity records drive the enforcement decision; the real compliance-hooks deployment wired to this contract passes every enforcement gate. Redeployed 2026-09-08 with the gas-optimized wasm (docs/gas.md): is_authorized now skips redundant token-binding reads and registry lookups for rules the policy does not enable. The admin secret key lives in the SAFEGUARD_ADMIN_SK env var only — never in this file."
+  "description": "Live Testnet deployment, redeployed and verified end-to-end on 2026-09-13. Every id above was read back from the live network after deployment rather than transcribed. Verified live on this contract id: schema_version returns 1; admin returns the configured admin; is_authorized(account, token) answers false (fail-closed) for a token that is not bound to an active policy; register_version, activate_version and bind_token each succeeded against the real ledger and emitted their events (policy_created, rule_registered x4, policy_activated, token_bound). The sibling deployment — safeguard-hooks CC7UKMCY3J7LB2WGU6D3MPRSSK3RKEC6MEXJJKOXRPTZAPRNXKPVPKPN — is wired to this contract id, and its initialize/configure/bind plus freeze/unfreeze administration were exercised live against it. Earlier verification, 2026-09-08: the predecessor deployment (CCOEMBBUNF3WO24YCH637G2TKCFGBN6QMUSUB4ODPLPGF4BUS64WPR47) approved a compliant subject and blocked denylist/sanctions matches; is_authorized approved only verified-active accounts on a bound token and answered false for unverified, frozen, suspended or restricted accounts, unbound tokens and inactive policies; and the real compliance-hooks deployment wired to it passed every enforcement gate. That deployment was rebuilt with the gas-optimized wasm (docs/gas.md) so is_authorized skips redundant token-binding reads and registry lookups for rules the policy does not enable. The admin secret key lives in the SAFEGUARD_ADMIN_SK env var only — never in this file."
 }
