@@ -59,6 +59,39 @@ issuers and integrators do not have to re-implement per deployment.
 bind to their tokens, plus the stable machine-readable schema that the rest
 of the ecosystem consumes.
 
+## Live Testnet deployment
+
+The policy contract is deployed to Stellar Testnet. The deployment is not
+described here by hand — it is recorded in
+[`deployments/testnet.json`](deployments/testnet.json), which carries the
+contract id, the admin public key, every shipped policy version with its
+configuration hash, and the tokens bound to each policy:
+
+|                    |                                                                     |
+| ------------------ | ------------------------------------------------------------------- |
+| Network            | Stellar Testnet (`Test SDF Network ; September 2015`)               |
+| RPC                | `https://soroban-testnet.stellar.org`                                |
+| Contract           | `CCOEMBBUNF3WO24YCH637G2TKCFGBN6QMUSUB4ODPLPGF4BUS64WPR47`           |
+| Shipped policies   | `institutional-default` v1, `enforcement-default` v1                |
+| Admin public key   | `GB3P6MQJIYFNWFQ5SU3PDUWOIBKKS5O7QF5LMIPQ3WQBXSXK4LNFIRO3`          |
+| Redeploy           | `bash scripts/deploy-testnet.sh`                                     |
+
+The admin **secret** key is never stored in the repository — deployment
+reads it from the `SAFEGUARD_ADMIN_SK` environment variable. Confidential
+Tokens on Stellar are a developer preview, so treat this deployment as a
+rehearsal rather than production.
+
+Measured cost of every public contract function is in
+[`docs/gas.md`](docs/gas.md); the deploy and upgrade drills are in
+[`docs/deployment.md`](docs/deployment.md) and
+[`scripts/rehearse-upgrade.sh`](scripts/rehearse-upgrade.sh).
+
+The sibling deployments this one is wired to are recorded next to their own
+contracts: `safeguard-hooks` in
+[`deployments/testnet/configuration.json`](https://github.com/Safeguard-Inc/safeguard-hooks/blob/main/deployments/testnet/configuration.json).
+
+---
+
 ## What this repository defines
 
 - **Policy model** — policies, versions, activation state, configuration
