@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Pipeline and release hardening — batch 2
+
+- **Release pipeline unblocked** — the workflow had failed validation
+  on every push since introduction (43/43 runs red, zero jobs ever
+  scheduled) because job-level `if` expressions referenced the
+  `secrets` context, which GitHub only admits at step level. Publishing
+  is now gated inside the steps and the registry steps degrade to a
+  notice when tokens are absent. Documented in `CONTRIBUTING.md`.
+- **Bounded CI runtime** — every job carries an explicit
+  `timeout-minutes` instead of GitHub's 6-hour default.
+- **Concurrency groups** — one active run per (workflow, ref); rapid
+  pushes supersede stale runs, the nightly sweep never cancels
+  in-flight verification.
+- **Workflow validation gate** — actionlint (pinned release, verified
+  against the upstream SHA-256 checksum) runs as the first CI job and
+  reproduces GitHub's validation rules, so this class of silent
+  pipeline breakage cannot recur here.
+- **`cargo publish --locked`** — released crates are the audited
+  lockfile graph; registry drift fails the publish loudly instead of
+  shipping quietly.
+- **Rehearsable releases** — `workflow_dispatch` runs the full gate and
+  artifact build without publishing; the three publishing jobs are
+  hard-gated on `github.ref_type == 'tag'`.
+- **Hermetic deploy dry-run** — `deploy-testnet.sh --dry-run` no longer
+  demands the stellar CLI or a prebuilt wasm artifact it never uses,
+  fixing both local rehearsal and the release gate's scripts_gate.
+- **Shell script gate** — `bash -n` + `shellcheck --severity=style`
+  over every script, on every push and in the release gate.
+- **README** — release workflow badge added for pipeline visibility
+  parity with the sibling repos.
+
 ### Changed — enforcement-wire hardening
 
 - **Identity expiry enforced on the wire** — `is_authorized` now degrades an

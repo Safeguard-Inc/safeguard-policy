@@ -67,11 +67,20 @@ step() {
     "$@"
 }
 
-command -v stellar >/dev/null 2>&1 || {
-    echo "error: stellar CLI not found on PATH" >&2
-    echo "install: https://github.com/stellar/stellar-cli" >&2
-    exit 1
-}
+# --dry-run must be hermetic: it only prints the commands an operator would
+# run, so it cannot require tools or artifacts it never touches. Both the
+# stellar CLI check and the wasm-existence check are therefore live-run
+# requirements only. (The release gate rehearses these scripts in a fresh
+# runner via scripts/ci.sh, where neither stellar-cli nor a prior wasm build
+# exists — an unconditional check would break the gate, and did until this
+# was fixed.)
+if [[ $DRY_RUN -eq 0 ]]; then
+    command -v stellar >/dev/null 2>&1 || {
+        echo "error: stellar CLI not found on PATH" >&2
+        echo "install: https://github.com/stellar/stellar-cli" >&2
+        exit 1
+    }
+fi
 
 if [[ $DRY_RUN -eq 0 ]]; then
     echo "network: $NETWORK"
@@ -92,10 +101,12 @@ else
     fi
     cargo build -p safeguard-contract --target wasm32v1-none --release
 fi
-[[ -f "$WASM" ]] || {
-    echo "error: $WASM not found after build" >&2
-    exit 1
-}
+if [[ $DRY_RUN -eq 0 ]]; then
+    [[ -f "$WASM" ]] || {
+        echo "error: $WASM not found after build" >&2
+        exit 1
+    }
+fi
 
 step "Deploying the policy contract (alias: $ALIAS)" \
     stellar contract deploy \
@@ -126,22 +137,24 @@ if [[ $LOAD_POLICY -eq 1 ]]; then
     # Compute the 32-byte zero-padded ASCII policy id and the sha256 of the
     # policy JSON deterministically, so the payloads below are reproducible.
     POLICY_FILE="policies/default/policy.json"
-    POLICY_ID_HEX=$(python3 - <<'EOF'
+    # POLICY_FILE is the single source of truth: every read below takes the
+    # path as argv[1], so repointing the loader means editing one line.
+    POLICY_ID_HEX=$(python3 - "$POLICY_FILE" <<'EOF'
 import json, sys
-policy = json.load(open("policies/default/policy.json"))
+policy = json.load(open(sys.argv[1]))
 raw = policy["policy_id"].encode("ascii")
 print(raw.ljust(32, b"\0").hex())
 EOF
 )
-    CONFIG_HASH=$(python3 - <<'EOF'
-import hashlib
-data = open("policies/default/policy.json", "rb").read()
+    CONFIG_HASH=$(python3 - "$POLICY_FILE" <<'EOF'
+import hashlib, sys
+data = open(sys.argv[1], "rb").read()
 print(hashlib.sha256(data).hexdigest())
 EOF
 )
-    RULES_JSON=$(python3 - <<'EOF'
-import json
-policy = json.load(open("policies/default/policy.json"))
+    RULES_JSON=$(python3 - "$POLICY_FILE" <<'EOF'
+import json, sys
+policy = json.load(open(sys.argv[1]))
 TYPE = {"allowlist": 0, "denylist": 1, "sanctions": 2, "jurisdiction": 3}
 ACTION = {"block": 0, "flag": 1}
 rules = []
@@ -156,7 +169,7 @@ print(json.dumps(rules))
 EOF
 )
 
-    say "Registering policy version $(python3 -c "import json; print(json.load(open('policies/default/policy.json'))['version'])")"
+    say "Registering policy version $(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['version'])" "$POLICY_FILE")"
     step "stellar contract invoke register_version" \
         stellar contract invoke \
             --network "$NETWORK" \

@@ -89,6 +89,9 @@ scripts_gate() {
         bash -n "$script"
     done
 
+    echo "==> shell script lint (shellcheck, style severity)"
+    shellcheck --severity=style scripts/*.sh
+
     echo "==> operator runbooks (deploy + rehearse) dry-run"
     ./scripts/deploy-testnet.sh --dry-run >/dev/null
     ./scripts/rehearse-upgrade.sh --dry-run >/dev/null

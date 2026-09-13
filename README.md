@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/Safeguard-Inc/safeguard-policy/actions/workflows/ci.yml/badge.svg)](https://github.com/Safeguard-Inc/safeguard-policy/actions/workflows/ci.yml)
 [![Security](https://github.com/Safeguard-Inc/safeguard-policy/actions/workflows/security.yml/badge.svg)](https://github.com/Safeguard-Inc/safeguard-policy/actions/workflows/security.yml)
+[![Release](https://github.com/Safeguard-Inc/safeguard-policy/actions/workflows/release.yml/badge.svg)](https://github.com/Safeguard-Inc/safeguard-policy/actions/workflows/release.yml)
 
 **Safeguard** is compliance infrastructure for [Stellar Confidential
 Tokens](https://stellar.org/blog/developers/developer-preview-confidential-tokens-on-stellar).
