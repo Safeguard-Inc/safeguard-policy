@@ -1,0 +1,121 @@
+# CodeRabbit configuration for safeguard-policy.
+#
+# CI already enforces fmt, clippy with -D warnings, the whole test suite,
+# the contract wasm build, the coverage gate, the schema and fixture
+# checks, the TypeScript SDK typecheck/tests and the error-catalog parity
+# check. CodeRabbit therefore concentrates on what those gates cannot see:
+# determinism of the decision engine, stability of the published schemas
+# and reason codes, and parity between the Rust and TypeScript SDKs.
+language: en-US
+
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  review_status: true
+  collapse_walkthrough: false
+  sequence_diagrams: true
+  poem: false
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT MERGE"
+    base_branches:
+      - main
+
+  path_filters:
+    - "!**/target/**"
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/Cargo.lock"
+    - "!**/package-lock.json"
+    - "!CHANGELOG.md"
+
+  path_instructions:
+    - path: "crates/safeguard-core/**"
+      instructions: >-
+        The decision engine must be deterministic and free of ambient
+        state: the same policy version plus the same facts must always
+        yield the same Decision and ReasonCode. Flag anything that reads
+        the clock, a random source, a hash-map iteration order or an
+        environment variable on the evaluation path. ReasonCode and
+        ReasonLabel values are stable public API consumed by
+        safeguard-hooks and safeguard-audit -- new entries are appended,
+        never renumbered or reused.
+    - path: "crates/safeguard-contract/**"
+      instructions: >-
+        The on-chain contract. ContractError codes are public ABI quoted in
+        reverted transactions and stored audit records: flag any renumber,
+        removal or reuse. Storage-key and serialization changes are
+        migrations, not refactors, and need a version guard so an upgraded
+        contract cannot misread data written by the previous one. Flag any
+        entry point whose authority check is not the first thing it does.
+    - path: "policy-schema/**"
+      instructions: >-
+        These JSON schemas are the published contract the other two
+        repositories consume. Flag any removed or narrowed property, any
+        tightened `required`, and any change to an enum's member set without
+        a matching documentation and version note. The schema and the Rust
+        types are checked for parity in CI -- keep them in step.
+    - path: "sdk/typescript/src/**"
+      instructions: >-
+        The TypeScript SDK must agree with the Rust SDK on validation
+        semantics and on every decision label and reason string; the
+        parity tests parse the same fixture files. Flag any locally
+        invented validation rule, any `any` that hides a shape mismatch,
+        and any divergence from the Rust behaviour that the shared
+        fixtures do not already encode.
+    - path: "policies/**"
+      instructions: >-
+        Shipped policies are evaluated by fixtures and by the on-chain
+        contract. A change here changes compliance behaviour for real
+        deployments: flag any rule added or removed without a matching
+        fixture update, and any policy whose version is not bumped.
+    - path: ".github/workflows/**"
+      instructions: >-
+        Workflows are security-sensitive. Third-party actions must stay
+        pinned to a full commit SHA with the version in a trailing comment;
+        unpinned `@v*` references are a supply-chain defect. Check that
+        permissions follow least privilege and that every job has a bounded
+        timeout-minutes.
+
+  tools:
+    clippy:
+      enabled: true
+    actionlint:
+      enabled: true
+    shellcheck:
+      enabled: true
+    markdownlint:
+      enabled: true
+    yamllint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    semgrep:
+      enabled: true
+    checkov:
+      enabled: false
+    ruff:
+      enabled: true
+    # The TypeScript SDK ships no eslint configuration, so the linter is
+    # left off rather than emitting findings against default rules the
+    # project never agreed to.
+    eslint:
+      enabled: false
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  learnings:
+    scope: auto
+  issues:
+    scope: auto
+  pull_requests:
+    scope: auto
