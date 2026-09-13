@@ -12,6 +12,7 @@
 //! a live contract) is done through the generated contract client from
 //! `safeguard-contract`; see `docs/sdk.md`.
 
+pub mod composition;
 pub mod evaluate;
 pub mod model;
 pub mod registry;
@@ -20,6 +21,7 @@ pub mod validation;
 /// The SDK crate version (compile-time metadata for downstream tools).
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+pub use composition::{CompositionError, PolicyEntry, PolicySet, PolicySource, PolicyVersionKey};
 pub use evaluate::{EvaluationFacts, FactsFile};
 
 pub use safeguard_core::decision::{Decision, PolicyDecision, ReasonCode};

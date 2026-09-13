@@ -13,6 +13,8 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
+use safeguard_sdk::composition::{PolicySet, PolicySource};
+use safeguard_sdk::model::PolicyDocument;
 use safeguard_sdk::registry::{decode_subject_hash, SanctionsDatasetEntry};
 use safeguard_sdk::IdentityStatus;
 
@@ -297,7 +299,10 @@ pub fn validate(dir: &Path, sets: &FixtureSets) -> Vec<String> {
     // Token bindings: well-formed address, non-empty policy id, and the
     // policy must exist among the shipped reference policies (same rule as
     // scripts/check-fixtures.py, so the two gates cannot disagree).
-    let shipped_policies = shipped_policy_ids(dir);
+    let shipped = shipped_policies(dir);
+    if let Some(shipped) = &shipped {
+        problems.extend(shipped.problems.iter().cloned());
+    }
     for binding in &sets.tokens {
         if binding.policy_id.is_empty() {
             problems.push("tokens: binding with an empty policy_id".to_owned());
@@ -308,8 +313,8 @@ pub fn validate(dir: &Path, sets: &FixtureSets) -> Vec<String> {
                 binding.token
             ));
         }
-        if let Some(policy_ids) = &shipped_policies {
-            if !policy_ids.contains(&binding.policy_id) {
+        if let Some(shipped) = &shipped {
+            if !shipped.ids.contains(&binding.policy_id) {
                 problems.push(format!(
                     "tokens: policy {:?} has no shipped policy document",
                     binding.policy_id
@@ -321,38 +326,77 @@ pub fn validate(dir: &Path, sets: &FixtureSets) -> Vec<String> {
     problems
 }
 
-/// The `policy_id`s of the reference policies shipped next to the fixtures
-/// directory (`../default` and `../examples`). `None` when the fixtures
-/// directory is not inside a repository checkout (e.g. a temp dir), in
-/// which case the existence cross-check is skipped.
-fn shipped_policy_ids(dir: &Path) -> Option<std::collections::BTreeSet<String>> {
-    let mut ids = std::collections::BTreeSet::new();
+/// The reference policies shipped next to the fixtures directory, loaded as
+/// a **composed set** rather than a bag of ids.
+struct ShippedPolicies {
+    /// Every declared `policy_id`, for the token-binding cross-check.
+    ids: std::collections::BTreeSet<String>,
+    /// Identity collisions and unreadable documents, phrased as fixture
+    /// problems.
+    problems: Vec<String>,
+}
+
+/// Loads the reference policies shipped next to the fixtures directory
+/// (`../default` and `../examples`).
+///
+/// `None` when the fixtures directory is not inside a repository checkout
+/// (e.g. a temp dir), in which case the existence cross-check is skipped.
+///
+/// Composing them instead of collecting ids is the point: a second file
+/// declaring an identity that already exists is a collision to report, not
+/// a duplicate for a set to swallow. The earlier version collected
+/// `policy_id`s into a `BTreeSet`, so a colliding identity vanished silently
+/// and the cross-check passed — after which a token bound to that id
+/// resolved to whichever file the directory listing happened to yield last.
+fn shipped_policies(dir: &Path) -> Option<ShippedPolicies> {
+    let mut sources = Vec::new();
+    let mut problems = Vec::new();
     for relative in ["../default", "../examples"] {
         let directory = dir.join(relative);
-        let entries = std::fs::read_dir(&directory).ok()?;
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
-                continue;
-            }
-            let Ok(raw) = std::fs::read_to_string(&path) else {
-                continue;
+        let Ok(entries) = std::fs::read_dir(&directory) else {
+            continue;
+        };
+        // Sorted so collision reports do not depend on readdir order, which
+        // is exactly the nondeterminism this check exists to remove.
+        let mut paths: Vec<std::path::PathBuf> = entries
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("json"))
+            .collect();
+        paths.sort();
+        for path in paths {
+            let raw = match std::fs::read_to_string(&path) {
+                Ok(raw) => raw,
+                Err(error) => {
+                    problems.push(format!(
+                        "policies: {} cannot be read: {error}",
+                        path.display()
+                    ));
+                    continue;
+                }
             };
-            let Ok(document) = serde_json::from_str::<serde_json::Value>(&raw) else {
-                continue;
-            };
-            if let Some(id) = document
-                .get("policy_id")
-                .and_then(serde_json::Value::as_str)
-            {
-                ids.insert(id.to_owned());
+            match serde_json::from_str::<PolicyDocument>(&raw) {
+                Ok(document) => {
+                    sources.push(PolicySource::new(path.display().to_string(), document));
+                }
+                Err(error) => problems.push(format!(
+                    "policies: {} is not a policy document: {error}",
+                    path.display()
+                )),
             }
         }
     }
-    if ids.is_empty() {
+    if sources.is_empty() {
         return None;
     }
-    Some(ids)
+    let ids = sources
+        .iter()
+        .map(|source| source.document.policy_id.clone())
+        .collect();
+    if let Err(errors) = PolicySet::compose(sources) {
+        problems.extend(errors.iter().map(|error| format!("policies: {error}")));
+    }
+    Some(ShippedPolicies { ids, problems })
 }
 
 /// An uppercase ISO 3166-1 alpha-2 region code.
@@ -368,4 +412,172 @@ fn is_stellar_address(address: &str) -> bool {
         && address.as_bytes()[1..]
             .iter()
             .all(|byte| byte.is_ascii_uppercase() || (b'2'..=b'7').contains(byte))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+
+    /// A scratch layout with `policies/{default,examples}` and an empty
+    /// `policies/fixtures`, which is the shape `shipped_policies` walks.
+    fn layout(name: &str) -> PathBuf {
+        static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let root = std::env::temp_dir().join(format!(
+            "safeguard-fixtures-{}-{name}-{}",
+            std::process::id(),
+            COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        for directory in ["default", "examples", "fixtures"] {
+            std::fs::create_dir_all(root.join(directory)).unwrap();
+        }
+        root
+    }
+
+    fn policy_json(policy_id: &str, version: u32) -> String {
+        format!(
+            r#"{{"policy_id":"{policy_id}","version":{version},"rules":[
+                {{"id":"ALLOW-1","type":"allowlist","action":"block"}}]}}"#
+        )
+    }
+
+    fn sets_bound_to(policy_id: &str) -> FixtureSets {
+        FixtureSets {
+            accounts: Vec::new(),
+            universe: JurisdictionUniverse::default(),
+            sanctions: Vec::new(),
+            identity: Vec::new(),
+            tokens: vec![TokenBindingFixture {
+                policy_id: policy_id.to_owned(),
+                token: format!("G{}", "A".repeat(55)),
+                note: None,
+            }],
+        }
+    }
+
+    #[test]
+    fn a_colliding_shipped_policy_identity_is_reported() {
+        // The regression: two files declaring the same identity. Collecting
+        // ids into a set used to deduplicate them silently, so the gate
+        // passed and a token bound to this id had no well-defined rules.
+        let root = layout("collision");
+        std::fs::write(
+            root.join("default/policy.json"),
+            policy_json("institutional-default", 1),
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("examples/override.json"),
+            policy_json("institutional-default", 1),
+        )
+        .unwrap();
+
+        let problems = validate(
+            &root.join("fixtures"),
+            &sets_bound_to("institutional-default"),
+        );
+        assert!(
+            problems.iter().any(
+                |problem| problem.contains("duplicate policy version institutional-default v1")
+            ),
+            "{problems:?}"
+        );
+        assert!(
+            problems
+                .iter()
+                .any(|problem| problem.contains("examples/override.json")),
+            "the collision must name the origin: {problems:?}"
+        );
+    }
+
+    #[test]
+    fn a_new_version_of_a_shipped_policy_is_not_a_collision() {
+        let root = layout("versioned");
+        std::fs::write(
+            root.join("default/policy.json"),
+            policy_json("institutional-default", 1),
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("examples/v2.json"),
+            policy_json("institutional-default", 2),
+        )
+        .unwrap();
+
+        let problems = validate(
+            &root.join("fixtures"),
+            &sets_bound_to("institutional-default"),
+        );
+        assert!(problems.is_empty(), "{problems:?}");
+    }
+
+    #[test]
+    fn a_binding_to_an_unshipped_policy_is_still_reported() {
+        let root = layout("unshipped");
+        std::fs::write(
+            root.join("default/policy.json"),
+            policy_json("institutional-default", 1),
+        )
+        .unwrap();
+
+        let problems = validate(&root.join("fixtures"), &sets_bound_to("typo-policy"));
+        assert!(
+            problems
+                .iter()
+                .any(|problem| problem
+                    .contains("policy \"typo-policy\" has no shipped policy document")),
+            "{problems:?}"
+        );
+    }
+
+    #[test]
+    fn an_unreadable_shipped_policy_is_reported_rather_than_skipped() {
+        // The old code silently `continue`d past anything it could not parse,
+        // which is the same class of bug: a malformed shipped policy reduced
+        // the set the cross-check ran against without saying so.
+        let root = layout("malformed");
+        std::fs::write(root.join("default/policy.json"), "{ not json").unwrap();
+        std::fs::write(
+            root.join("examples/ok.json"),
+            policy_json("institutional-default", 1),
+        )
+        .unwrap();
+
+        let problems = validate(
+            &root.join("fixtures"),
+            &sets_bound_to("institutional-default"),
+        );
+        assert!(
+            problems
+                .iter()
+                .any(|problem| problem.contains("default/policy.json is not a policy document")),
+            "{problems:?}"
+        );
+    }
+
+    #[test]
+    fn an_invalid_shipped_policy_is_rejected_by_composition() {
+        let root = layout("invalid");
+        // Duplicate rule ids: valid JSON, invalid policy.
+        std::fs::write(
+            root.join("default/policy.json"),
+            r#"{"policy_id":"institutional-default","version":1,"rules":[
+                {"id":"A-1","type":"allowlist","action":"block"},
+                {"id":"A-1","type":"denylist","action":"block"}]}"#,
+        )
+        .unwrap();
+
+        let problems = validate(
+            &root.join("fixtures"),
+            &sets_bound_to("institutional-default"),
+        );
+        assert!(
+            problems
+                .iter()
+                .any(|problem| problem.contains("invalid policy document")
+                    && problem.contains("duplicate rule id")),
+            "{problems:?}"
+        );
+    }
 }

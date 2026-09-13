@@ -24,6 +24,7 @@ safeguard evaluate <policy.json> <facts.json>
 safeguard fixture validate [fixtures_dir]
 safeguard registry inspect <dataset.json>
 safeguard policy test <policy.json> [--fixtures-dir DIR] [--strict]
+safeguard policy compose <policy.json>… [--dir DIR]… [--quiet]
 ```
 
 ### `version`
@@ -132,6 +133,49 @@ safeguard policy test policies/examples/combined-policy.json
 with CI gates. Account fixtures carry no screening claim, so
 `sanctions_matched` is `false` for every subject; inspect the sanctions
 dataset separately with `registry inspect`.
+
+### `policy compose`
+
+Assembles policy documents from several sources into one set and reports
+contested identities:
+
+```bash
+safeguard policy compose --dir policies/default --dir policies/examples
+# composed 6 policy version(s)
+#   example-allowlist-only v1            policies/examples/allowlist-only.json
+#   example-combined v1                  policies/examples/combined-policy.json
+#   ...
+```
+
+`validate` checks one document, so it cannot see a property of the *set*:
+two different files declaring the same `policy_id` at the same `version`.
+An identity with two owners has no well-defined rules, and a binding that
+names only the policy id resolves to whichever document the loader reached
+last — which is why this is an error naming the id, the version, and both
+origins, not a silent overwrite:
+
+```text
+$ safeguard policy compose policies/default/policy.json v2/override.json
+1 composition error(s):
+  - duplicate policy version institutional-default v1 declared by
+    "policies/default/policy.json" and "v2/override.json" — an identity must
+    have exactly one source, or which rules apply depends on load order
+```
+
+A *new version* under an existing `policy_id` is not a collision — it is
+the version history the contract's append-only registry is built around:
+
+```text
+  institutional-default: versions 1, 2 — a binding by id resolves to v2
+```
+
+`--dir` reads a directory's top-level `*.json` in sorted order (repeatable),
+so a collision report never depends on filesystem order. Every document is
+also validated as it loads, so an invalid source is rejected rather than
+admitted into a set whose lookup would then depend on it. `--quiet` prints
+nothing on success. Exits non-zero when anything is rejected, so it composes
+with CI. The same identity check runs over the shipped policies in
+`scripts/check-fixtures.py` and in `fixture validate`.
 
 ### `dataset build`
 

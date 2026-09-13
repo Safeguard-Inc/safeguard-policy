@@ -11,6 +11,9 @@ Enforces the rules documented in policies/fixtures/README.md:
    well-formed attestation reference.
 4. Token fixtures map every policy id to a well-formed Stellar-style
    address, and every referenced policy id exists in the shipped policies.
+4b. No two shipped policies declare the same ``(policy_id, version)``. An
+   identity with two owners has no well-defined rules, and the collision is
+   only visible when the documents are composed, not one at a time.
 5. Every policy in policies/default and policies/examples validates
    (policy.schema.json + invariants via validate_policy.py).
 6. Every region code in a policy's jurisdiction rule exists in
@@ -53,6 +56,14 @@ REGION_LISTS = ("permitted", "restricted", "prohibited")
 def load_json(path: Path) -> dict | list:
     with path.open(encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def relative(path: Path) -> str:
+    """A repo-relative path for problem messages, falling back to absolute."""
+    try:
+        return str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
 
 
 def main() -> int:
@@ -104,10 +115,29 @@ def main() -> int:
 
     # ---- token fixtures ---------------------------------------------------
     tokens = load_json(FIXTURES_DIR / "tokens.json")["bindings"]
+    # The shipped policies are composed as a set of *identities* rather than
+    # a set of ids. Collecting only ids silently swallowed a collision: two
+    # files declaring the same (policy_id, version) collapsed into one entry,
+    # the cross-check below passed, and a token bound to that id resolved to
+    # whichever file the glob happened to yield last. The identity is the
+    # pair, so a second file must contest it explicitly.
     policy_ids: set[str] = set()
+    identities: dict[tuple[str, int], Path] = {}
     for directory in ("default", "examples"):
         for path in sorted((POLICIES_DIR / directory).glob("*.json")):
-            policy_ids.add(load_json(path)["policy_id"])
+            document = load_json(path)
+            policy_ids.add(document["policy_id"])
+            identity = (document["policy_id"], document["version"])
+            previous = identities.get(identity)
+            if previous is not None:
+                problems.append(
+                    f"policies: duplicate policy version {identity[0]!r} "
+                    f"v{identity[1]} declared by {relative(previous)} and {relative(path)}"
+                    " -- an identity must have exactly one source, or which rules"
+                    " apply depends on load order"
+                )
+            else:
+                identities[identity] = path
     for binding in tokens:
         if binding["policy_id"] not in policy_ids:
             problems.append(

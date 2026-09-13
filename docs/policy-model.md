@@ -48,6 +48,33 @@ The same data can therefore mean different things under different policies:
 a sanctions match may block under one policy and flag for review under
 another.
 
+## Composing documents
+
+The invariants above are properties of **one** document. A policy set is
+assembled from many — the reference policies in `policies/default` and
+`policies/examples`, a vendor bundle, a deployment's override directory —
+and that assembly has a failure mode no single-document check can see:
+
+> two sources claiming the same identity, `(policy_id, version)`.
+
+Nothing downstream can tell them apart. A binding that names only a
+`policy_id` resolves to whichever document the loader happened to reach
+last, so **which rule parameters apply becomes an accident of read order**.
+The pair `(policy_id, version)` is therefore treated as an identity that at
+most one source may own, and composition reports a contest rather than
+overwriting silently: it names the id, the version, and both origins.
+
+The identity is the *pair*, which keeps version history intact — a second
+version under the same `policy_id` is the append-only chain above, not a
+collision.
+
+Composition also validates each document as it loads, so an invalid source
+is rejected instead of being admitted into a set whose lookup would then
+depend on it. [`safeguard_sdk::composition`](../crates/safeguard-sdk/src/composition.rs)
+is the implementation; `safeguard policy compose` is the CLI surface, and
+`scripts/check-fixtures.py` and `safeguard fixture validate` run the same
+identity check over the shipped policies.
+
 ## Versions: append-only
 
 **A policy never silently mutates.** Every change is a new version:

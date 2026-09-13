@@ -451,12 +451,125 @@ fn policy_test_reports_the_expected_decisions() {
 }
 
 /// Create a temporary fixtures dir containing the given files.
+///
+/// Unique per call for the same reason `temp_file` is: keying only on the
+/// process id makes two tests that pick the same `name` share a directory.
 fn temp_dir_with(name: &str, files: &[(&str, &str)]) -> PathBuf {
-    let dir =
-        std::env::temp_dir().join(format!("safeguard-cli-test-{}-{name}", std::process::id()));
+    let seq = TEMP_FILE_SEQ.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!(
+        "safeguard-cli-test-{}-{seq}-{name}",
+        std::process::id()
+    ));
     fs::create_dir_all(&dir).expect("create temp dir");
     for (file, content) in files {
         fs::write(dir.join(file), content).expect("write temp fixture");
     }
     dir
+}
+
+/// A minimal valid policy document with the given identity.
+fn policy_doc(policy_id: &str, version: u32) -> String {
+    format!(
+        r#"{{
+  "policy_id": "{policy_id}",
+  "version": {version},
+  "rules": [
+    {{ "id": "ALLOWLIST-001", "type": "allowlist", "action": "block" }}
+  ]
+}}"#
+    )
+}
+
+#[test]
+fn compose_assembles_distinct_identities() {
+    let alpha = temp_file("alpha.json", &policy_doc("alpha", 1));
+    let beta = temp_file("beta.json", &policy_doc("beta", 1));
+
+    let (ok, stdout, stderr) = run(&[
+        "policy",
+        "compose",
+        alpha.to_str().unwrap(),
+        beta.to_str().unwrap(),
+    ]);
+    assert!(ok, "distinct identities must compose: {stderr}");
+    assert!(stdout.contains("composed 2 policy version(s)"), "{stdout}");
+    // Identity order is deterministic, not filesystem order.
+    let alpha_at = stdout.find("alpha v1").expect("alpha listed");
+    let beta_at = stdout.find("beta v1").expect("beta listed");
+    assert!(alpha_at < beta_at, "{stdout}");
+}
+
+#[test]
+fn compose_rejects_a_contested_identity_and_names_both_origins() {
+    // The case the previous id-set cross-check swallowed: the same policy id
+    // at the same version from two different files.
+    let first = temp_file("origin-one.json", &policy_doc("institutional-default", 1));
+    let second = temp_file("origin-two.json", &policy_doc("institutional-default", 1));
+
+    let (ok, _, stderr) = run(&[
+        "policy",
+        "compose",
+        first.to_str().unwrap(),
+        second.to_str().unwrap(),
+    ]);
+    assert!(!ok, "a contested identity must fail");
+    assert!(
+        stderr.contains("duplicate policy version institutional-default v1"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("origin-one.json"), "{stderr}");
+    assert!(stderr.contains("origin-two.json"), "{stderr}");
+    assert!(stderr.contains("load order"), "{stderr}");
+}
+
+#[test]
+fn compose_treats_a_new_version_as_version_history() {
+    let v1 = temp_file("v1.json", &policy_doc("institutional-default", 1));
+    let v2 = temp_file("v2.json", &policy_doc("institutional-default", 2));
+
+    let (ok, stdout, stderr) = run(&[
+        "policy",
+        "compose",
+        v1.to_str().unwrap(),
+        v2.to_str().unwrap(),
+    ]);
+    assert!(ok, "a new version is history, not a conflict: {stderr}");
+    assert!(stdout.contains("versions 1, 2"), "{stdout}");
+    assert!(stdout.contains("resolves to v2"), "{stdout}");
+}
+
+#[test]
+fn compose_rejects_an_invalid_document_at_load_time() {
+    let good = temp_file("good.json", &policy_doc("alpha", 1));
+    let bad = temp_file("bad.json", INVALID_POLICY);
+
+    let (ok, _, stderr) = run(&[
+        "policy",
+        "compose",
+        good.to_str().unwrap(),
+        bad.to_str().unwrap(),
+    ]);
+    assert!(!ok);
+    assert!(stderr.contains("invalid policy document"), "{stderr}");
+    assert!(stderr.contains("duplicate rule id"), "{stderr}");
+}
+
+#[test]
+fn compose_reads_directories_in_sorted_order_and_supports_quiet() {
+    let dir = temp_dir_with(
+        "compose-dir",
+        &[
+            ("b.json", &policy_doc("beta", 1)),
+            ("a.json", &policy_doc("alpha", 1)),
+        ],
+    );
+    let (ok, stdout, stderr) = run(&[
+        "policy",
+        "compose",
+        "--dir",
+        dir.to_str().unwrap(),
+        "--quiet",
+    ]);
+    assert!(ok, "{stderr}");
+    assert!(stdout.trim().is_empty(), "--quiet printed: {stdout}");
 }

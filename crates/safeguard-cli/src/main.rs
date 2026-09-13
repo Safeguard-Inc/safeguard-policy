@@ -111,6 +111,20 @@ enum PolicyCommand {
         #[arg(long)]
         strict: bool,
     },
+    /// Compose policy documents from multiple sources and report contested
+    /// identities (the same policy id declared at the same version twice).
+    Compose {
+        /// Policy JSON documents to compose.
+        paths: Vec<PathBuf>,
+        /// Also compose every top-level *.json in this directory
+        /// (repeatable). Directories are read in sorted order so a collision
+        /// report never depends on filesystem order.
+        #[arg(long = "dir")]
+        dirs: Vec<PathBuf>,
+        /// Print nothing on success (exit status is the answer).
+        #[arg(long)]
+        quiet: bool,
+    },
 }
 
 fn main() {
@@ -134,6 +148,9 @@ fn main() {
                     strict,
                 },
         } => commands::policy::run(&policy, &fixtures_dir, strict),
+        Command::Policy {
+            command: PolicyCommand::Compose { paths, dirs, quiet },
+        } => commands::compose::run(&paths, &dirs, quiet).map(|_| ()),
         Command::Dataset {
             command: DatasetCommand::Build(args),
         } => commands::dataset::run(args),
