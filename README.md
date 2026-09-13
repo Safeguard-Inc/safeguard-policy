@@ -22,6 +22,7 @@ It is organized as three repositories with a strict separation of duties:
 | `safeguard-policy` | **Define** | What the rules are: policy model, rule primitives, registries, versions, evaluation. **← you are here** |
 | `safeguard-hooks`  | **Enforce** | That the rules run on token operations: authorization, blocking, flagging. |
 | `safeguard-audit`  | **Verify** | What happened: compliance events, investigation, reporting. |
+| `safeguard-docs`   | **Explain** | How it fits together, and a [live decision-engine demo](https://safeguard-docs.vercel.app/demo) you can run without cloning anything. |
 
 The dependency chain is one-way and versioned:
 
@@ -42,6 +43,14 @@ This repository answers:
 
 It does **not** block token transfers. Enforcement belongs to
 `safeguard-hooks`.
+
+📖 **Documentation hub:** <https://safeguard-docs.vercel.app> —
+[architecture](https://safeguard-docs.vercel.app/docs/architecture) ·
+[live Testnet contracts](https://safeguard-docs.vercel.app/docs/contracts) ·
+[error codes](https://github.com/Safeguard-Inc/safeguard-docs/blob/main/docs/error-codes.md)
+
+> **Quick links:** [live policy contract](#live-testnet-deployment) ·
+> [gas measurements](docs/gas.md) · [open issues](https://github.com/Safeguard-Inc/safeguard-policy/issues)
 
 ---
 
