@@ -3,6 +3,7 @@
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 const BIN: &str = env!("CARGO_BIN_EXE_safeguard-cli");
 
@@ -47,10 +48,27 @@ qods force|SSI|active|2021-04-15
 unmapped entity|XYZ|active|2023-01-01
 ";
 
+/// Monotonic counter making every `temp_file` call's directory unique within
+/// the test process.
+static TEMP_FILE_SEQ: AtomicUsize = AtomicUsize::new(0);
+
 /// Write `content` to a unique temp file and return its path.
+///
+/// The directory is keyed by process id *and* a per-call sequence number.
+/// The process id alone is not enough: cargo runs the tests in one binary on
+/// several threads, and two tests that happen to choose the same file name
+/// would otherwise share a path. That is not hypothetical -- `report.json` is
+/// written by both `registry_inspect_summarizes_each_dataset_kind` and
+/// `dataset_build_normalizes_a_snapshot_and_reports_review_items`, and
+/// `valid.json` by two more. Whichever test wrote last won, so a test could
+/// read an empty or foreign file, which surfaced in CI as
+/// `report is JSON: Error("EOF while parsing a value", line: 1, column: 0)`.
 fn temp_file(name: &str, content: &str) -> PathBuf {
-    let dir =
-        std::env::temp_dir().join(format!("safeguard-cli-test-{}-{name}", std::process::id()));
+    let seq = TEMP_FILE_SEQ.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!(
+        "safeguard-cli-test-{}-{seq}-{name}",
+        std::process::id()
+    ));
     fs::create_dir_all(&dir).expect("create temp dir");
     let path = dir.join(name);
     fs::write(&path, content).expect("write temp file");
