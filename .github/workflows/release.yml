@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    # Operator rehearsal: run the full gate + artifact build against any ref
+    # without cutting a release. The registry/GitHub-release jobs below are
+    # tag-gated, so a dispatch exercises everything except publishing —
+    # valuable because a pipeline that has never run cannot be trusted at
+    # tag time (this one ran red for days before its first rehearsal).
 
 # A release cut is per-tag by definition, so runs can never collide; the
 # group still guards against a forced tag re-push racing an in-flight gate.
@@ -108,6 +114,10 @@ jobs:
     name: Publish Rust crates to crates.io
     needs: gate
     runs-on: ubuntu-latest
+    # Tag-only: the `github` context is legal at job level (unlike
+    # `secrets`), and a manual dispatch on main must never attempt a
+    # registry publish.
+    if: github.ref_type == 'tag'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -143,6 +153,8 @@ jobs:
     name: Publish TypeScript SDK to npm
     needs: gate
     runs-on: ubuntu-latest
+    # Tag-only, same reasoning as publish-crates.
+    if: github.ref_type == 'tag'
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -171,6 +183,9 @@ jobs:
     name: Publish GitHub release
     needs: build
     runs-on: ubuntu-latest
+    # Tag-only: on a dispatch GITHUB_REF_NAME would be the branch name, and
+    # `gh release create main` would cut a nonsense release.
+    if: github.ref_type == 'tag'
     timeout-minutes: 10
     permissions:
       contents: write
