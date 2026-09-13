@@ -7,7 +7,16 @@ CPU instructions, ledger footprint, storage rent and transaction size.
 
 Measured on Testnet, 2026-09-08, against the deployment recorded in
 `deployments/testnet.json`, using `scripts/bench-gas.sh` (repeat runs vary
-by a few percent).
+by a few percent), from the wasm built by the Rust release pinned in
+`rust-toolchain.toml` (`1.98.1`).
+
+Every number below is a measurement, so it is only meaningful next to the
+compiler that produced it: the contract that was benchmarked was built by a
+specific `rustc`, and a different release produces a different wasm and
+therefore different fees. Re-measure with `bash scripts/install-toolchain.sh`
+followed by `bash scripts/bench-gas.sh`, and note the release in any figure
+you publish — the pin and the numbers move together (procedure in
+`rust-toolchain.toml`).
 
 ## Current (gas-optimized wasm)
 

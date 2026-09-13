@@ -70,17 +70,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # stable
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
+      # Installs the exact release pinned in rust-toolchain.toml and fails if
+      # the version that resolves is not the pin. Previously this step asked
+      # for `stable` explicitly, which meant the pin in the toolchain file was
+      # decorative for every job here.
+      - name: Install the pinned Rust toolchain
+        run: scripts/install-toolchain.sh --component rustfmt --component clippy
 
       - uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2.87.10
         with:
           tool: shellcheck
-
-      - name: Add Soroban wasm target
-        run: rustup target add wasm32v1-none
 
       - name: Run the Rust gate
         run: ./scripts/ci.sh rust
@@ -99,10 +98,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # stable
-        with:
-          toolchain: stable
-          components: llvm-tools-preview
+      # llvm-tools-preview is CI-only (the coverage job); it is not in the
+      # toolchain file because a contributor does not need it.
+      - name: Install the pinned Rust toolchain
+        run: scripts/install-toolchain.sh --component llvm-tools-preview
 
       - uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2.87.10
         with:

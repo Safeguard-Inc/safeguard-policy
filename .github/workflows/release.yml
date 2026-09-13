@@ -32,10 +32,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # stable
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
+      - name: Install the pinned Rust toolchain
+        run: scripts/install-toolchain.sh --component rustfmt --component clippy
 
       # scripts_gate (inside ci.sh all) shellchecks the operator scripts.
       - uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2.87.10
@@ -55,9 +53,6 @@ jobs:
       - name: Install validation dependencies
         run: python3 -m pip install jsonschema
 
-      - name: Add Soroban wasm target
-        run: rustup target add wasm32v1-none
-
       - name: Install cargo-deny
         uses: EmbarkStudios/cargo-deny-action@b66acf5e9fe20f8aba065be86778a8a4c846f902 # v2
         with:
@@ -76,18 +71,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # stable
-        with:
-          toolchain: stable
+      # The release artefact is a published byte count: the pinned compiler
+      # builds it, not whatever `stable` happens to be that morning.
+      - name: Install the pinned Rust toolchain
+        run: scripts/install-toolchain.sh --target wasm32v1-none
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: sdk/typescript/package-lock.json
-
-      - name: Add Soroban wasm target
-        run: rustup target add wasm32v1-none
 
       - name: Build the contract wasm artifact
         run: cargo build --locked -p safeguard-contract --target wasm32v1-none --release
@@ -127,9 +120,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # stable
-        with:
-          toolchain: stable
+      - name: Install the pinned Rust toolchain
+        run: scripts/install-toolchain.sh
 
       # The `secrets` context is NOT available in job-level `if` expressions:
       # referencing it there makes GitHub reject the whole workflow file at
