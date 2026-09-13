@@ -17,10 +17,17 @@ on:
       - "sdk/typescript/package-lock.json"
   workflow_dispatch:
 
+# One active run per (workflow, ref); the nightly sweep never cancels an
+# in-flight push verification on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
+
 jobs:
   cargo-deny:
     name: Rust advisories & licenses
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -33,6 +40,7 @@ jobs:
   npm-audit:
     name: TypeScript dependency audit
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: sdk/typescript

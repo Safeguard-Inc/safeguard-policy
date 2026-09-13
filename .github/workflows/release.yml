@@ -5,6 +5,12 @@ on:
     tags:
       - "v*"
 
+# A release cut is per-tag by definition, so runs can never collide; the
+# group still guards against a forced tag re-push racing an in-flight gate.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 # Least privilege: nothing here needs a write token except the job that
 # creates the GitHub release. Every other job — including the ones holding
 # third-party registry tokens — runs read-only, so a compromised step cannot
@@ -16,6 +22,7 @@ jobs:
   gate:
     name: Full gate
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -54,6 +61,7 @@ jobs:
     name: Build artifacts
     needs: gate
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -100,6 +108,7 @@ jobs:
     name: Publish Rust crates to crates.io
     needs: gate
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -131,6 +140,7 @@ jobs:
     name: Publish TypeScript SDK to npm
     needs: gate
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -158,6 +168,7 @@ jobs:
     name: Publish GitHub release
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
