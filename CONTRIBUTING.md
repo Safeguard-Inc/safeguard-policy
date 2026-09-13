@@ -96,6 +96,28 @@ Follow the repository style: imperative subject lines that describe *why*,
 with a body that explains context. See recent history for examples. Changes
 are committed one logical improvement at a time rather than bundled.
 
+## Cutting a release
+
+1. Record the version under CHANGELOG.md's `Unreleased` heading, dated
+   today, and commit that on its own.
+2. Rehearse first: dispatch the `Release` workflow from the Actions tab
+   (or `gh workflow run Release`). The full gate and the artifact build
+   run against `main`; the publishing jobs are tag-gated and skip.
+3. When the rehearsal is green, tag and push: `git tag vX.Y.Z && git
+   push origin vX.Y.Z`. The pipeline runs the full gate, builds the
+   contract wasm, CLI, and SDK tarball, creates the GitHub release with
+   all artifacts attached, then publishes the crates to crates.io
+   (core → sdk → adapters → cli, in dependency order, `--locked`) and
+   the TypeScript SDK to npm.
+4. Publishing to the registries requires the `CARGO_REGISTRY_TOKEN` and
+   `NPM_TOKEN` repository secrets. Without them the GitHub release is
+   still cut with every artifact attached, and the registry steps skip
+   with a notice — a release before credentials are provisioned is not
+   a failed pipeline.
+
+Contract, policy, and schema versioning rules live in
+`docs/versioning.md`.
+
 ## License
 
 Apache-2.0. By contributing you agree your contributions are licensed under
